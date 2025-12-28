@@ -1,0 +1,3750 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>獅子山 Lion Rock POS</title>
+<style>
+  :root {--green:#0d4f3a;--red:#d32f2f;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+/* ===== Tablet-friendly baseline (MUST come first) ===== */
+html, body{
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overscroll-behavior: none;
+}
+
+/* Safe viewport height for tablets + browsers */
+body{
+  min-height: 100dvh;
+  min-height: 100vh;
+}
+
+/* Tablet touch devices only (visual polish, optional) */
+@media (pointer: coarse){
+  .ticket{ font-size:120%; }
+  .pay-btn{ font-size:1.05em; }
+}
+
+  /* Overall layout */
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang HK",sans-serif;
+    background:#f0f2f5;
+    height:100vh;           /* full viewport height */
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;        /* page itself doesn’t scroll */
+  }
+
+  /* POS view fills the space under the tabs */
+  #pos-view{
+    height: 100%;
+    flex:1;
+    min-height:0;
+    overflow: flex;
+    display:flex;
+    flex-direction:column;
+  }
+
+#pos-view .main{
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+
+  /* Center area: left (menu) + right (order panel) */
+  .main{
+    flex:1;
+    display:flex;
+    overflow:hidden;        /* children manage their own scroll */
+    min-height:0;          /* 👈 allow children to shrink & scroll */
+  }
+
+  .left{
+    flex:1;
+    overflow-y:auto;        /* menu scrolls */
+    padding:20px;
+    background:#f0f2f5;
+    min-height:0;          /* 👈 inside flex row */
+  }
+
+  .right{
+    width:400px;
+    flex-shrink:0;          /* fixed width column */
+    background:white;
+    border-left:1px solid #ddd;
+    padding:15px;
+    display:flex;
+    flex-direction:column;  /* stack meta + list + footer */
+    min-height:0;          /* 👈 let #order-list take the scroll */
+    overflow:hidden;        /* prevent column from growing; order-list will scroll */
+  }
+
+/* Compact the Order Summary title (overrides inline style) */
+.right h2{
+  font-size:1.4em !important;     /* was 1.8em */
+  margin-bottom:10px !important;  /* was 18px */
+}
+
+  /* Order list scrolls inside fixed-height right column */
+  #order-list{
+    flex:1;
+    min-height:0;          /* 👈 otherwise it can push footer off-screen */
+    overflow-y:auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .category{
+     margin-bottom:18px;
+  }
+
+  .category h2{
+    margin-bottom:10px;
+    font-size:1.0em;
+  }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.item {
+  padding: 14px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.item h3 {
+  font-size: 1.45em;
+  font-weight: 600;
+}
+
+.price {
+  font-size: 1.0em;
+  font-weight: bold;
+  color: var(--green);
+}
+
+  .order-item{
+    padding:8px 0;
+    border-bottom:1px solid #eee;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+  }
+
+  .order-item .info > div:not(.price-line){
+  font-size: 1.2em;     /* +20% */
+  }
+
+  .order-item .price-line{
+    font-size:1.2em;
+    font-weight:bold;
+    color:var(--green);
+    text-align:right;
+    margin-bottom:4px;
+  }
+  .delete-btn{
+    background:none;
+    border:none;
+    color:#bbb;
+    cursor:pointer;
+    font-size:1.05em;
+    margin-left:12px;
+  }
+  .delete-btn:hover{color:var(--red);}
+
+  .edit-btn{
+    background:none;
+    border:none;
+    color:#bbb;              /* same grey as trash icon */
+    cursor:pointer;
+    font-size:1.05em;        /* same size as trash icon */
+    margin-left:12px;
+  }
+
+  .order-actions{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:3px;
+  }
+
+/* --- Order summary row layout: name left, price+icons right --- */
+.order-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+
+.order-item .info{
+  flex:1;
+  min-width:0; /* allow long names to wrap */
+}
+
+/* Keep name/mods on left */
+.order-item .info > div:not(.price-line){
+  font-size:1.2em;   /* keep your +20% */
+  line-height:1.15;
+}
+
+/* Price stays on the right near the icons */
+.order-item .price-line{
+  margin-left:auto;
+  font-size:1.05em;   /* slightly smaller than name */
+  white-space:nowrap;
+  text-align:right;
+}
+
+/* Put price + icons in the same right column */
+.order-actions{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:4px;            /* compact */
+}
+
+  /* Footer total + buttons live at bottom of right column */
+  .total{
+    font-size:2em;
+    font-weight:bold;
+    color:var(--green);
+    text-align:right;
+    margin:20px 0;
+  }
+  button.big{
+    padding:22px;
+    font-size:1.5em;
+    border:none;
+    border-radius:14px;
+    cursor:pointer;
+    width:100%;
+    margin-bottom:14px;
+    font-weight:bold;
+  }
+  .print{background:#e9ecef;color:#333;}
+  .pay{background:var(--green);color:white;}
+
+  .pay-buttons{
+    display:flex;
+    gap:12px;
+    margin-bottom:14px;
+  }
+
+  .pay-btn{
+    flex:1;
+    padding:16px;
+    font-size:1.2em;
+    border:none;
+    border-radius:14px;
+    cursor:pointer;
+    font-weight:bold;
+  }
+
+  /* Card = light button */
+  #card-btn{
+    background:#e9ecef;
+    color:#333;
+  }
+
+  /* Cash = green button */
+  #pay-btn{
+    background:var(--green);
+    color:white;
+  }
+
+  #modal{
+    padding: 12px;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.9);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+  }
+  #modal .modalc-content{
+   width: 900px;
+   max-height: 90vh;
+   padding: 14px;
+  }
+  
+  .modal-box{
+    background:white;
+    border-radius:22px;
+    width:95%;
+    max-width:920px;
+    max-height:92vh;
+    overflow:auto;
+    gap:4px;
+  }
+  .modal-head{
+    background:var(--green);
+    height:60px;
+    color:white;
+    padding:15px;
+    text-align:center;
+    font-size:1.6em;
+    border-radius:22px 22px 0 0;
+    gap:4px;
+  }
+  .modal-body{
+    padding:32px;
+  }
+
+  .modal button{
+   padding: 8px 12px;
+   font-size: 14px;
+  }
+
+  .opts{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:4px;
+    margin:2px;
+  }
+  .opt{
+    padding:14px 18px;
+    background:#f8f9fa;
+    border-radius:10px;
+    text-align:center;
+    cursor:pointer;
+    border:2px solid transparent;
+    font-size:16px;
+    font-weight:600;
+    user-select:none;
+  }
+  .opt.sel{
+    background:var(--green);
+    color:white;
+  }
+  .red{color:var(--red);font-weight:bold;}
+  .blue {color: #007bff;font-weight: bold;}
+  textarea{
+    width:100%;
+    height:50px;
+    padding:14px;
+    border-radius:14px;
+    border:1px solid #ddd;
+    margin-top:18px;
+    font-size:1.2em;
+    resize:none;
+  }
+  .modal-footer{
+    height:80px;
+    padding:15px;
+    background:#f8f9fa;
+    border-radius:0 0 22px 22px;
+    display:flex;
+    gap:4px;
+    justify-content:flex-end;
+  }
+  .modal-footer button{
+    padding:16px 50px;
+    font-size:1.5em;
+    border:none;
+    border-radius:14px;
+    cursor:pointer;
+    font-weight:bold;
+    min-width:140px;
+  }
+
+  .cancel{
+    background:#ffffff;
+    color:#333;
+    padding: 8px 12px;
+    font-size: 14px;
+
+  }
+  .confirm{background:var(--green);color:white;}
+
+  .empty-order{
+    text-align:center;
+    color:#aaa;
+    margin-top:80px;
+    font-size:1.3em;
+  }
+
+  @media (max-width: 900px) {
+    .main{
+      flex-direction:column;
+    }
+    .right{
+      width:100%;
+      border-left:none;
+      border-top:1px solid #ddd;
+    }
+  }
+
+  .cash-toggle {
+    margin-left: 12px;
+    padding: 8px 16px;
+    font-size: 0.9em;
+    border-radius: 999px;
+    border: 1px solid #ccc;
+    background: #f8f9fa;
+    cursor: pointer;
+  }
+  .cash-toggle.active {
+    border-color: var(--green);
+    background: var(--green);
+    color: white;
+    font-weight: bold;
+  }
+
+  /* Payment modal */
+  #pay-modal{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.8);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:110;
+  }
+  .pay-box{
+    background:white;
+    border-radius:20px;
+    width:90%;
+    max-width:420px;
+    overflow:hidden;
+    box-shadow:0 10px 30px rgba(0,0,0,0.3);
+  }
+  .pay-head{
+    background:var(--green);
+    color:white;
+    padding:20px;
+    text-align:center;
+    font-size:1.6em;
+    font-weight:bold;
+  }
+  .pay-body{
+    padding:20px 24px;
+  }
+  .pay-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:16px;
+    font-size:1.1em;
+  }
+  .pay-row label{
+    margin-right:12px;
+  }
+  .pay-row input{
+    flex:1;
+    padding:8px 10px;
+    border-radius:10px;
+    border:1px solid #ccc;
+    font-size:1.1em;
+  }
+  .pay-change strong{
+    font-size:1.5em;
+  }
+  .pay-change.negative strong{
+    color:var(--red);
+  }
+  .pay-footer {
+    padding: 20px;
+    background: #f8f9fa;
+    display: flex;
+    justify-content: flex-end;
+    gap: 14px;
+  }
+  .pay-footer button {
+    padding: 22px;
+    font-size: 1.5em;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    font-weight: bold;
+    min-width: 160px;
+  }
+  .pay-footer .cancel {
+    background: #ddd;
+    color: #333;
+  }
+  .pay-footer .confirm {
+    background: var(--green);
+    color: white;
+  }
+
+  /* Order meta (order number / type / channel) */
+  .order-meta {
+    Flex:0 0 auto;
+  }
+
+/* ✅ this MUST be present */
+#order-list{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+  .order-meta-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .order-meta-row label {
+    width: 80px;
+    color: #555;
+  }
+  .order-meta-row input,
+  .order-meta-row select {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 0.9em;
+  }
+
+  /* Top tabs */
+  .tabs {
+    display: flex;
+    background: #01392C;
+    border-bottom: 1px solid #ddd;
+    flex-shrink:0;
+  }
+  .tab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    color: #fff;
+    background: none;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 1em;
+  }
+  .tab.active {
+    color: #c39c4b;
+    border-bottom: 3px solid var(--green);
+  }
+
+  /* Kitchen / Bar ticket layout */
+  .ticket-grid {
+    padding: 16px;
+    background: #f0f2f5;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  /* Kitchen & Bar views fill remaining height and scroll */
+  #kitchen-view,
+  #bar-view,
+  #all-orders-view {
+    flex:1;
+    overflow-y:auto;
+  }
+
+  .ticket {
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    padding: 14px 16px;
+  }
+  .ticket-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.95em;
+    color: #555;
+  }
+  .ticket-header .badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.8em;
+    background: #f1f3f5;
+  }
+
+  .ticket-body {
+    font-size: 1.1em;
+  }
+
+  /* Special backgrounds for delivery services */
+  .ticket-deliveroo {
+    background: #e0f7f5;  /* light turquoise, still easy to read text */
+  }
+
+  .ticket-justeat {
+    background: #ffe8d8;  /* light orange, not too strong */
+  }
+
+  /* Special backgrounds for onsite and tel orders */
+  .ticket-onsite {
+    background: #e6f7e6;  /* light green */
+  }
+
+  .ticket-tel {
+    background: #f0e8ff;  /* light purple */
+  }
+
+  /* Retrieve button in All orders */
+  .retrieve-btn {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid #1976d2;
+    background: #e3f2fd;
+    cursor: pointer;
+    font-size: 0.8em;
+    white-space: nowrap;
+  }
+
+/* Pay button styled like Retrieve */
+.pay-pending-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #1976d2;
+  background: #e3f2fd;
+  cursor: pointer;
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+.pay-pending-btn:active {
+  transform: translateY(1px);
+}
+
+.ticket-item {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticket-item-main {
+  flex: 1;
+}
+
+.ticket-item.done .ticket-item-name {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.ticket-status-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  background: #f8f9fa;
+  cursor: pointer;
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+
+.ticket-status-btn.done {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+  font-weight: bold;
+}
+
+.retrieve-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #007bff;
+  background: #e7f1ff;
+  cursor: pointer;
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+
+  .ticket-item-name {
+    font-weight: 600;
+  }
+  .ticket-mods {
+    font-size: 0.9em;
+    color: #666;
+  }
+
+.ticket-item-actions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+  .export-btn {
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid #ccc;
+    background: #ffffff;
+    cursor: pointer;
+    font-size: 0.9em;
+  }
+
+.cash-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.preset-btn {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  background: #f5f6f7;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.preset-btn:active {
+  transform: translateY(1px);
+}
+
+.badge-pending { background:#fff3cd; border:1px solid #ffeeba; }
+.badge-paid { background:#d4edda; border:1px solid #c3e6cb; }
+
+.customer-screen{
+  padding: 18px;
+  background: #fff;
+  height: 100%;
+  overflow-y: auto;
+  font-size: 18px;
+}
+.customer-title{
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.customer-meta{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom: 12px;
+  color:#333;
+}
+.customer-pill{
+  border:1px solid #e5e5e5;
+  border-radius:999px;
+  padding: 6px 10px;
+  background:#fafafa;
+}
+.customer-card{
+  border:1px solid #e5e5e5;
+  border-radius:12px;
+  padding: 12px;
+  background:#fafafa;
+}
+.customer-item{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding: 8px 0;
+  border-bottom:1px dashed #ddd;
+}
+.customer-item:last-child{ border-bottom:none; }
+.customer-mods{
+  font-size: 0.95em;
+  color:#444;
+  margin-top:4px;
+}
+.customer-total{
+  font-size: 22px;
+  font-weight: 900;
+  margin-top: 14px;
+  display:flex;
+  justify-content:space-between;
+}
+
+/* Tablet readability boost */
+#kitchen-view,
+#bar-view,
+#all-orders-view {
+  font-size: 120%;
+}
+
+.ticket-status-btn,
+.retrieve-btn,
+.pay-pending-btn {
+  font-size: 1em;
+  padding: 10px 14px;
+}
+
+.order-footer {
+  flex:0 0 auto;
+}
+
+/* ===== Waitlist ===== */
+
+#waitlist-view{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.waitlist-container{
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.waitlist-form{
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.waitlist-form input{
+  padding: 8px;
+  font-size: 14px;
+}
+
+.waitlist-list{
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wait-item{
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wait-info{
+  font-size: 14px;
+}
+
+.wait-actions button{
+  margin-left: 6px;
+}
+
+/* =========================
+   WAITLIST (Screenshot style)
+   ========================= */
+
+:root{
+  --wl-navy:#0b0f47;
+  --wl-cream:#f4f1ea;
+  --wl-gold:#c99500;
+  --wl-green:#0b3a2f;
+  --wl-border:#d8caa3;
+  --wl-text:#1b1b1b;
+}
+
+#waitlist-view{
+  flex:1;
+  min-height:0;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  background: var(--wl-cream);
+}
+
+/* Page shell */
+.wl-page{
+  flex:1;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  padding: 14px;
+  box-sizing:border-box;
+}
+
+.wl-hero{
+  background: var(--wl-cream);
+  color:#000;
+  border-radius: 18px 18px 0 0;
+  padding: 18px 18px;
+}
+
+.wl-hero-title{
+  font-size: 30px;
+  font-weight: 800;
+  text-align:center;
+  letter-spacing:.5px;
+}
+
+.wl-hero-title span{
+  font-weight: 700;
+  margin-left: 10px;
+}
+
+.wl-body{
+  background: var(--wl-cream);
+  border-radius: 0 0 18px 18px;
+  padding: 18px;
+  display:flex;
+  flex-direction:column;
+  gap: 16px;
+  min-height:0;
+}
+
+/* Form */
+.wl-form{
+  display:grid;
+  grid-template-columns: 1.1fr 0.9fr 180px;
+  gap: 14px;
+  align-items:end;
+}
+
+.wl-field label{
+  display:block;
+  font-weight: 800;
+  color: var(--wl-text);
+  margin-bottom: 8px;
+}
+
+.wl-field label span{
+  font-weight: 700;
+  margin-left: 8px;
+}
+
+.wl-field input,
+.wl-field select{
+  width:100%;
+  box-sizing:border-box;
+  border: 2px solid var(--wl-gold);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 16px;
+  background: #fff;
+  outline:none;
+}
+
+.wl-field input:focus,
+.wl-field select:focus{
+  box-shadow: 0 0 0 3px rgba(201,149,0,0.18);
+}
+
+.wl-confirm-btn{
+  height: 48px;
+  border: none;
+  border-radius: 10px;
+  background: var(--wl-gold);
+  color:#fff;
+  font-weight: 900;
+  font-size: 18px;
+  cursor:pointer;
+}
+
+.wl-confirm-btn:active{ transform: translateY(1px); }
+
+/* Counter card */
+.wl-count-card{
+  background: var(--wl-navy);
+  color:#fff;
+  border-radius: 16px;
+  padding: 18px;
+  text-align:center;
+}
+
+.wl-count-number{
+  font-size: 54px;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.wl-count-label{
+  font-size: 16px;
+  font-weight: 800;
+  opacity: .95;
+}
+
+.wl-count-label span{
+  font-weight: 800;
+  margin-left: 8px;
+  opacity: .95;
+}
+
+/* Table */
+.wl-table-wrap{
+  background:#fff;
+  border: 2px solid var(--wl-border);
+  border-radius: 14px;
+  overflow-y: auto;          /* ✅ scroll here */
+  max-height: 420px;         /* adjust for tablet */
+}
+
+.wl-table{
+  width:100%;
+   table-layout: fixed;   /* ✅ lock column widths */
+  border-collapse: collapse;
+}
+
+.wl-table thead th{
+  background: var(--wl-green);
+  color:#fff;
+  padding: 14px 12px;
+  font-size: 16px;
+  font-weight: 900;
+  text-align:left;
+  border-bottom: 2px solid rgba(255,255,255,0.15);
+  white-space: nowrap;     /* ✅ keep 中文 + English on one line */
+  font-size: 15px;         /* ✅ slightly smaller so it fits nicely */
+}
+
+.wl-table thead th span{
+  display: inline;
+  white-space: nowrap;
+  margin-left: 6px;
+  font-weight: 800;
+  opacity: .95;
+}
+
+.wl-table tbody td{
+  padding: 14px 12px;
+  border-top: 1px solid #eee;
+  font-size: 16px;
+  color: var(--wl-text);
+  vertical-align: middle;
+}
+
+.wl-pos{
+  font-weight: 900;
+}
+
+.wl-actions{
+  display:flex;
+  gap: 10px;
+  flex-wrap:wrap;
+}
+
+.wl-btn{
+  border: 1px solid #d0d0d0;
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 800;
+  cursor:pointer;
+}
+
+.wl-btn-seat{
+  border-color: #b7c4bf;
+}
+
+.wl-btn-remove{
+  border-color: #d7b1b1;
+}
+
+.wl-empty{
+  padding: 34px 18px;
+  text-align:center;
+  background:#fff;
+}
+
+.wl-empty-title{
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--wl-green);
+  margin-bottom: 8px;
+}
+
+.wl-empty-sub{
+  font-size: 18px;
+  color: var(--wl-navy);
+  font-weight: 700;
+}
+
+.wl-table th,
+.wl-table td{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wl-table td:nth-child(1),
+.wl-table td:nth-child(3){
+  font-weight: 700;
+}
+
+.wl-table td:nth-child(3),
+.wl-table th:nth-child(3){
+  text-align: center;   /* Party size aligned */
+}
+
+.wl-table td:nth-child(4),
+.wl-table th:nth-child(4){
+  text-align: center;   /* Wait time aligned */
+}
+
+.admin-item-sales-grid{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top:10px;
+}
+
+.ais-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#f6f7f8;
+}
+
+.ais-name{
+  font-weight:600;
+}
+
+.ais-qty{
+  font-weight:800;
+}
+
+/* Responsive: tablet portrait */
+@media (max-width: 900px){
+  .wl-form{ grid-template-columns: 1fr; }
+  .wl-confirm-btn{ width: 100%; }
+  .wl-table tbody{ max-height: 260px; }
+}
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <!-- Top tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="pos-view">落單</button>
+    <button class="tab" data-tab="kitchen-view">廚房</button>
+    <button class="tab" data-tab="bar-view">水吧</button>
+    <button class="tab" data-tab="all-orders-view">全部訂單</button>
+    <button class="tab" data-tab="customer-view">Customer View</button>
+    <button class="tab" data-tab="waitlist-view">等位</button>
+    <button class="tab" data-tab="admin-view">Admin</button>
+  </div>
+
+  <!-- POS view -->
+  <div id="pos-view">
+    <div class="main">
+      <div class="left" id="menu-content"></div>
+
+      <div class="right">
+        <!-- Order meta (order #, service, channel) -->
+        <div class="order-meta">
+         <!-- Table number (we keep the same id so JS still works) -->
+        <div class="order-meta-row">
+         <label for="order-number">Table #</label>
+         <input id="order-number" type="text" />
+     </div>
+
+     <!-- Combined order type: dine-in / tel / f2f / Deliveroo / JustEat -->
+     <div class="order-meta-row">
+        <label for="order-type">Type</label>
+        <select id="order-type">
+         <option value="dine-in">堂食</option>
+        <option value="onsite">現場外賣</option>
+        <option value="tel">電話外賣</option>
+        <option value="deliveroo">Deliveroo</option>
+        <option value="justeat">Just Eat</option>
+      </select>
+    </div>
+
+    <!-- Expected pickup time -->
+    <div class="order-meta-row">
+      <label for="pickup-time">Pickup</label>
+      <input id="pickup-time" type="time" step="60" />
+    </div>
+  </div>
+
+        <!-- Order summary -->
+        <h2 style="font-size:1.8em;color:var(--green);margin-bottom:18px;">Order Summary</h2>
+        <div id="order-list">
+          <p class="empty-order">No items yet</p>
+        </div>
+
+        <!-- Discounts + total + Pay -->
+        <div id="discount-summary" style="text-align:right; color:#d32f2f; font-weight:bold;"></div>
+        <div class="total">
+          <span>Total <span id="total">£0.00</span></span>
+        </div>
+
+        <!-- Card, Cash, Add, Unpaid pay buttons -->
+       <div class="order-footer">
+        <div class="pay-buttons">
+         <button class="pay-btn" id="card-btn" type="button">Card</button>
+         <button class="pay-btn pay-cash" id="pay-btn" type="button">Cash</button>
+         <button class="pay-btn" id="platform-btn" type="button">Add</button>
+         <button class="pay-btn" id="unpaid-btn" type="button">Unpaid</button>
+       </div>
+      </div>
+    </div>
+  </div>
+ </div>
+
+  <!-- Kitchen view (for food items) -->
+  <div id="kitchen-view" style="display:none;">
+    <div id="kitchen-orders" class="ticket-grid"></div>
+  </div>
+
+  <!-- Bar view (for drinks) -->
+  <div id="bar-view" style="display:none;">
+    <div id="bar-orders" class="ticket-grid"></div>
+  </div>
+
+  <!-- All orders view (combined food + drinks) -->
+  <div id="all-orders-view" style="display:none;">
+    <div style="display:flex;justify-content:flex-end;align-items:center;padding:8px 16px;background:#f0f2f5;">
+  </div>
+
+  <div id="all-orders" class="ticket-grid"></div>
+</div>
+
+<!-- Customer view -->
+<div id="customer-view" style="display:none;">
+  <div id="customer-screen" class="customer-screen"></div>
+</div>
+
+<!-- Waitlist view -->
+<!-- Waitlist view -->
+<div id="waitlist-view" style="display:none;">
+  <div class="wl-page">
+
+    <div class="wl-hero">
+      <div class="wl-hero-title">登記候位表 <span>Restaurant Waitlist</span></div>
+    </div>
+
+    <div class="wl-body">
+
+      <!-- Form row -->
+      <div class="wl-form">
+        <div class="wl-field">
+          <label>姓名 <span>Customer Name</span></label>
+          <input id="wait-name" type="text" placeholder="輸入 Enter customer name" />
+        </div>
+
+        <div class="wl-field">
+          <label>人數 <span>Party Size</span></label>
+          <select id="wait-pax">
+            <option value="">選擇 Select size</option>
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+            <option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
+          </select>
+        </div>
+
+        <button id="add-wait-btn" class="wl-confirm-btn" type="button">確認 Confirm</button>
+      </div>
+
+      <!-- Big counter card -->
+      <div class="wl-count-card">
+        <div class="wl-count-number" id="wl-count">0</div>
+        <div class="wl-count-label">等待人數 <span>Parties Waiting</span></div>
+      </div>
+
+      <!-- Table -->
+      <div class="wl-table-wrap">
+        <table class="wl-table">
+         <colgroup>
+           <col style="width:20%">
+           <col style="width:20%">
+           <col style="width:20%">
+           <col style="width:20%">
+           <col style="width:20%">
+         </colgroup>
+          <thead>
+            <tr>
+              <th>號碼 POSITION</th>
+              <th>姓名 CUSTOMER NAME</th>
+              <th>人數 PARTY SIZE</th>
+              <th>等待時間 WAIT TIME</th>
+              <th>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody id="waitlist-tbody">
+            <!-- rows injected by JS -->
+          </tbody>
+        </table>
+
+        <!-- Empty state -->
+        <div id="wl-empty" class="wl-empty" style="display:none;">
+          <div class="wl-empty-title">No customers waiting</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Admin view -->
+<div id="admin-view" style="display:none;">
+  <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;background:#f0f2f5;border-bottom:1px solid #ddd;">
+    <div style="display:flex;gap:10px;align-items:center;">
+      <strong>Daily Sales</strong>
+      <input type="date" id="admin-date" />
+      <button type="button" id="admin-refresh" class="export-btn">Refresh</button>
+    </div>
+    <button id="export-csv-btn" type="button" class="export-btn">Export CSV</button>
+  </div>
+
+  <div id="admin-summary" style="padding:16px;"></div>
+</div>
+
+  <!-- Options modal -->
+  <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+      <div class="modal-head" id="modal-title">選擇選項</div>
+      <div class="modal-body">
+        <!-- (all your opts groups – unchanged) -->
+        <!-- 熱 / 凍 -->
+        <div class="opts" id="hot-cold-opts" style="display:none;">
+          <div class="opt">熱</div>
+          <div class="opt">凍</div>
+        </div>
+
+        <!-- 粒粒椰汁紅豆冰 -->
+        <div class="opts" id="redbean-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div>
+          <div class="opt">少椰奶</div><div class="opt">少花奶</div>
+          <div class="opt">走椰奶</div><div class="opt">走花奶</div>
+        </div>
+
+        <!-- 好立克 & 阿華田 -->
+        <div class="opts" id="ovaltine-horlicks-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div><div class="opt">煉奶</div><div class="opt">少甜</div>
+        </div>
+
+        <!-- 柚子薑蜜 -->
+        <div class="opts" id="citron-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div>
+        </div>
+
+        <!-- 奶茶專用 -->
+        <div class="opts" id="milktea-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div><div class="opt">冰底</div>
+          <div class="opt">煉奶</div><div class="opt">少甜</div>
+        </div>
+
+        <!-- 咖啡專用 -->
+        <div class="opts" id="coffee-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div>
+          <div class="opt">花奶</div><div class="opt">少花奶</div><div class="opt">煉奶</div><div class="opt">少甜</div>
+        </div>
+
+        <!-- 鴛鴦專用 -->
+        <div class="opts" id="yuenyeung-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div>
+          <div class="opt">少花奶</div><div class="opt">煉奶</div><div class="opt">少甜</div>
+        </div>
+
+        <!-- 西多士專用 -->
+        <div class="opts" id="french-toast-opts" style="display:none;">
+          <div class="opt">煉奶</div>
+        </div>
+
+        <!-- 主食選項 -->
+        <div class="opts" id="brisket-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">撈粗</div><div class="opt">撈拉麵</div><div class="opt">撈丁</div><div class="opt">湯粗</div><div class="opt">湯拉麵</div><div class="opt">湯丁</div>
+          <div class="opt">淨牛腩</div><div class="opt">淨牛筋</div><div class="opt">多牛腩</div><div class="opt">多牛筋</div><div class="opt">少牛腩</div><div class="opt">少牛筋</div><div class="opt">走乾蒜</div>
+        </div>
+        <div class="opts" id="tomato-baked-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div><div class="opt">多菠蘿</div>
+          <div class="opt">走菠蘿</div><div class="opt">走芝士</div><div class="opt">轉雞扒</div><div class="opt">免焗</div>
+        </div>
+        <div class="opts" id="portuguese-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div>
+          <div class="opt">走芝士</div><div class="opt">轉豬扒</div><div class="opt">免焗</div>
+        </div>
+        <div class="opts" id="charsiu-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">煎熟蛋</div><div class="opt">撈粗</div><div class="opt">走乾蒜</div>
+        </div>
+        <div class="opts" id="basic-rice-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div>
+        </div>
+        <div class="opts" id="plain-curry-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">多薯仔</div><div class="opt">少薯仔</div>
+          <div class="opt">走薯仔</div><div class="opt">走乾蒜</div>
+        </div>
+        <div class="opts" id="baked-curry-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div><div class="opt">多薯仔</div>
+          <div class="opt">少薯仔</div><div class="opt">走薯仔</div><div class="opt">走芝士</div><div class="opt">免焗</div>
+        </div>
+        <div class="opts" id="spring-onion-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">撈丁</div><div class="opt">撈粗</div>
+          <div class="opt">撈拉麵</div><div class="opt">湯米</div><div class="opt">湯通</div><div class="opt">湯意</div>
+          <div class="opt">多蔥油</div><div class="opt">少蔥油</div><div class="opt">煎熟蛋</div><div class="opt">走乾蒜</div>
+        </div>
+        <div class="opts" id="chakee-noodles-opts" style="display:none;">
+          <div class="opt">丁</div><div class="opt">湯米</div><div class="opt">湯通</div><div class="opt">湯意</div>
+          <div class="opt">湯粗</div><div class="opt">湯拉麵</div>
+          <div class="opt">太陽蛋</div><div class="opt">煎熟蛋</div><div class="opt">炒熟蛋</div>
+          <div class="opt">走包</div><div class="opt">包走牛油</div><div class="opt">包少牛油</div><div class="opt">包多牛油</div><div class="opt">包唔烘</div><div class="opt">包烘耐啲</div>
+        </div>
+
+        <!-- 茶記粉面 - 餐 -->
+        <div class="opts" id="set-meal-opts" style="display:none;">
+          <div class="opt">餐</div>
+        </div>
+
+        <!-- Global options (all items) -->
+         <div class="opts" id="global-opts" style="display:none;">
+         <div class="opt">外賣</div>
+         <div class="opt">後上</div>
+        </div>
+
+        <textarea placeholder="特別要求..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="cancel" id="cancel">Cancel</button>
+        <button class="confirm" id="add">Add to Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment modal -->
+  <div id="pay-modal">
+    <div class="pay-box">
+      <div class="pay-head">Payment</div>
+      <div class="pay-body">
+        <div class="pay-row">
+          <span>Amount due:</span>
+          <strong id="amount-due">£0.00</strong>
+        </div>
+
+        <div class="pay-row">
+          <label for="amount-received">Cash received:</label>
+          <input type="number" id="amount-received" step="0.01" min="0" />
+        </div>
+        <!-- QUICK CASH PRESETS (ADD THIS) -->
+        <div class="cash-presets">
+         <button type="button" class="preset-btn" data-val="exact">Exact</button>
+         <button type="button" class="preset-btn" data-val="10">£10</button>
+         <button type="button" class="preset-btn" data-val="20">£20</button>
+         <button type="button" class="preset-btn" data-val="30">£30</button>
+         <button type="button" class="preset-btn" data-val="50">£50</button>
+        </div>
+
+        <div class="pay-row pay-change">
+          <span>Change:</span>
+          <strong id="change-amount">£0.00</strong>
+        </div>
+      </div>
+      <div class="pay-footer">
+        <button type="button" id="pay-cancel" class="cancel">Cancel</button>
+        <button type="button" id="pay-confirm" class="confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const menu = [
+  // 主食 & 咖喱系列
+  { name:"咖喱雞扒飯", price:11.8, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false },
+  { name:"咖喱豬扒飯", price:11.8, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false },
+  { name:"咖喱牛腩飯", price:12.3, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false },
+  { name:"焗咖喱雞扒飯", price:12.8, cat:"咖喱系列", optionGroups:["baked-curry-opts"], hotCold:false },
+  { name:"焗咖喱豬扒飯", price:12.8, cat:"咖喱系列", optionGroups:["baked-curry-opts"], hotCold:false },
+  { name:"焗咖喱牛腩飯", price:13.3, cat:"咖喱系列", optionGroups:["baked-curry-opts"], hotCold:false },
+
+  { name:"沙嗲牛肉", price:8.9, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "沙嗲牛肉丁", SoupVermicelliName:"沙嗲牛肉湯米", SoupMacaroniName:"沙嗲牛肉湯通", SoupSpaghettiName:"沙嗲牛肉湯意", SoupMeinName:"沙嗲牛肉湯粗", SoupRamenName:"沙嗲牛肉湯拉麵"},
+  { name:"雪菜肉絲", price:8.4, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "雪菜肉絲丁", SoupVermicelliName:"雪菜肉絲湯米", SoupMacaroniName:"雪菜肉絲湯通", SoupSpaghettiName:"雪菜肉絲湯意", SoupMeinName:"雪菜肉絲湯粗", SoupRamenName:"雪菜肉絲湯拉麵" },
+  { name:"叉燒", price:8.4, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "叉燒丁", SoupVermicelliName:"叉燒湯米", SoupMacaroniName:"叉燒湯通", SoupSpaghettiName:"叉燒湯意", SoupMeinName:"叉燒湯粗", SoupRamenName:"叉燒湯拉麵" },
+  { name:"五香肉丁", price:8.4, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "五香肉丁", SoupVermicelliName:"五香肉丁湯米", SoupMacaroniName:"五香肉丁湯通", SoupSpaghettiName:"五香肉丁湯意", SoupMeinName:"五香肉丁湯粗", SoupRamenName:"五香肉丁湯拉麵" },
+  { name:"火腿", price:7.9, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "火腿丁", SoupVermicelliName:"火腿湯米", SoupMacaroniName:"火腿湯通", SoupSpaghettiName:"火腿湯意", SoupMeinName:"火腿湯粗", SoupRamenName:"火腿湯拉麵" },
+
+  { name:"柱侯牛腩飯", price:11.8, cat:"主食", optionGroups:["brisket-opts"], hotCold:false, loMeinName:"柱侯牛筋腩撈粗", loRamenName:"柱侯牛腩撈拉麵", loDingName:"柱侯牛腩撈丁", SoupMeinName:"柱侯牛筋腩湯粗", SoupRamenName:"柱侯牛筋腩湯拉麵", SoupDingName:"柱侯牛筋腩湯丁"},
+  { name:"蜜汁叉燒煎蛋飯", price:11.5, cat:"主食", optionGroups:["charsiu-opts"], hotCold:false, loMeinName:"蜜汁叉燒煎蛋撈粗" },
+  { name:"鮮茄焗豬扒飯", price:12.5, cat:"主食", optionGroups:["tomato-baked-opts"], hotCold:false },
+  { name:"葡汁焗雞扒飯", price:12.5, cat:"主食", optionGroups:["portuguese-opts"], hotCold:false },
+  { name:"蔥油雞扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"蔥油雞扒煎蛋撈粗", loRamenName:"蔥油雞扒煎蛋撈拉麵", loDingName:"蔥油雞扒煎蛋撈丁", SoupVermicelliName:"蔥油雞扒煎蛋湯米", SoupMacaroniName:"蔥油雞扒煎蛋湯通", SoupSpaghettiName:"蔥油雞扒煎蛋湯意" },
+  { name:"蔥油豬扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"蔥油豬扒煎蛋撈粗", loRamenName:"蔥油豬扒煎蛋撈拉麵", loDingName:"蔥油豬扒煎蛋撈丁", SoupVermicelliName:"蔥油豬扒煎蛋湯米", SoupMacaroniName:"蔥油豬扒煎蛋湯通", SoupSpaghettiName:"蔥油豬扒煎蛋湯意"  },
+  { name:"泡菜五花腩飯", price:11.5, cat:"主食", optionGroups:["basic-rice-opts"], hotCold:false },
+  { name:"滑蛋鰻魚飯", price:13.5, cat:"主食", optionGroups:["basic-rice-opts"], hotCold:false },
+
+  // 飲品
+  { name:"奶茶", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","milktea-opts"], hotCold:true },
+  { name:"粒粒椰汁紅豆冰", price:4.0, cat:"飲品", optionGroups:["redbean-opts"], hotCold:false },
+  { name:"檸茶", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts"], hotCold:true },
+  { name:"檸水", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts"], hotCold:true },
+  { name:"凍咸檸七", price:3.5, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"好立克", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
+  { name:"阿華田", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
+  { name:"柚子薑蜜", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","citron-opts"], hotCold:true },
+  { name:"凍檸樂", price:2.5, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"咖啡", price:2.0, cat:"飲品", optionGroups:["hot-cold-opts","coffee-opts"], hotCold:true },
+  { name:"Coke", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"Zero", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"7up", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"鴛鴦", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","yuenyeung-opts"], hotCold:true },
+
+// 套餐手動折扣
+  { name:"套餐 -£0.5", price:-0.5, cat:"飲品", optionGroups:[], hotCold:false, isManualDiscount:true },
+
+  // 小食
+  { name:"土匪雞翼", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
+  { name:"鹵水牛展", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
+  { name:"花生醬西多士", price:6.5, cat:"小食", optionGroups:["french-toast-opts"], hotCold:false },
+  { name:"半份西多士", price:4.0, cat:"小食", optionGroups:["french-toast-opts"], hotCold:false },
+  { name:"炒蛋多士", price:2.0, cat:"小食", optionGroups:[], hotCold:false, excludeFromComboB:true },
+];
+
+let order = [];
+let current = null;
+let isCash = false;
+let lastBaseTotal = 0;
+let lastFinalTotal = 0;
+let lastSubtotal = 0;
+let lastComboACount = 0;
+let lastComboBCount = 0;
+let lastMealDealDiscount = 0;
+let lastCashDiscount = 0;
+let nextOrderId = 1;
+let kitchenOrders = [];
+let completedOrders = [];
+let archivedOrders = [];   // orders that have been fully completed in kitchen/bar
+let payingOrderId = null;   // when paying an existing Unpaid ticket
+let adminUnlocked = false;
+let waitlist = [];
+let editingTicketItem = null;
+// shape: { ticketId: string, lane: 'food'|'drink', index: number }
+const ADMIN_PASSWORD = '1234'; // change this
+
+// ======================
+// Supabase (Orders only)
+// ======================
+const SUPABASE_URL = "https://vvbfrotwyboddmzoayjt.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2YmZyb3R3eWJvZGRtem9heWp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1MzA2MTMsImV4cCI6MjA4MjEwNjYxM30.xxSFrntN7n0tvWJy78rLEa7UX8oGco6lb9hUm9O_Bn0";
+
+let supabase = null;
+let realtimeStarted = false;
+
+if (window.supabase && typeof window.supabase.createClient === 'function') {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} else {
+  console.warn('Supabase library not loaded. Running local-only.');
+}
+
+// Stable item id for DB updates (Complete/Retrieve)
+function genClientKey() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') return crypto.randomUUID();
+  return String(Date.now()) + '_' + Math.random().toString(16).slice(2);
+}
+
+async function ensureSupabaseLogin() {
+  if (!supabase) return false;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) return true;
+
+  const email = prompt("Owner login email:");
+  const password = prompt("Owner login password:");
+  if (!email || !password) return false;
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    alert("Login failed: " + error.message);
+    return false;
+  }
+  return true;
+}
+
+// === Editing & Direct Add Controls ===
+let editingOrderItemIndex = null;
+let pendingItemToAdd = null;
+
+// ===== Device access mode (cashier vs customer tablet) =====
+function getMode() {
+  const params = new URLSearchParams(window.location.search);
+  return (params.get('mode') || '').toLowerCase();
+}
+
+function applyTabAccessMode() {
+  const mode = getMode();
+  if (mode !== 'customer') return;
+
+  // Only allow these TWO views on a customer tablet
+  const allowedViews = new Set(['customer-view', 'waitlist-view']);
+
+  // Hide tab buttons that are not allowed
+  document.querySelectorAll('.tab[data-tab]').forEach(btn => {
+    const viewId = btn.dataset.tab; // e.g. "customer-view"
+    if (!allowedViews.has(viewId)) {
+      btn.style.display = 'none';
+    }
+  });
+
+  // Hide view containers that are not allowed
+  const allViews = [
+    'pos-view',
+    'kitchen-view',
+    'bar-view',
+    'all-orders-view',
+    'customer-view',
+    'waitlist-view',
+    'admin-view'
+  ];
+
+  allViews.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.style.display = allowedViews.has(id) ? 'block' : 'none';
+    if (id === 'pos-view' && allowedViews.has(id)) el.style.display = 'flex';
+  });
+
+  // Force switch to Customer View tab
+  switchToView('customer-view');
+}
+
+const DIRECT_ADD_CATEGORIES = ["咖喱系列", "主食", "小食"];
+const DIRECT_ADD_DRINKS = [
+  "Coke",
+  "Zero",
+  "7up",
+  "凍檸樂",
+  "凍咸檸七",
+  "柚子薑蜜",
+  "粒粒椰汁紅豆冰",
+  "套餐 -£0.5",
+];
+
+function renderMenu() {
+  const catOrder = ["咖喱系列","茶記粉面","主食","飲品","小食"];
+  const menuContent = document.getElementById('menu-content');
+
+  const itemsWithIndex = menu.map((item, index) => ({ ...item, index }));
+  const html = catOrder.map(cat => {
+    const items = itemsWithIndex.filter(i => i.cat === cat);
+    if (!items.length) return '';
+    const itemsHtml = items.map(item => `
+      <button type="button" class="item" data-index="${item.index}">
+        <h3>${item.name}</h3>
+        <div class="price">£${item.price.toFixed(2)}</div>
+      </button>
+    `).join('');
+    return `
+      <div class="category">
+        <h2>${cat}</h2>
+        <div class="grid">
+          ${itemsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  menuContent.innerHTML = html;
+}
+
+function openModal(item, menuIndex) {
+  current = {
+    baseName: item.name,
+    price: item.price,
+    isHotCold: !!item.hotCold,
+    loMeinName: item.loMeinName || null,
+    loRamenName: item.loRamenName || null,
+    loDingName: item.loDingName || null,
+    SoupMeinName: item.SoupMeinName || null,
+    SoupRamenName: item.SoupRamenName || null,
+    SoupDingName: item.SoupDingName || null,
+    SoupVermicelliName: item.SoupVermicelliName || null,
+    SoupMacaroniName: item.SoupMacaroniName || null,
+    SoupSpaghettiName: item.SoupSpaghettiName || null,
+    DingName: item.DingName || null,
+    cat: item.cat,
+    menuIndex: (typeof menuIndex === 'number') ? menuIndex : null,
+    excludeFromComboB: !!item.excludeFromComboB
+  };
+
+  const head = document.querySelector('.modal-head');
+  if (head) head.textContent = `選擇選項：${item.name}`;
+
+  document.querySelectorAll('.opts').forEach(o => o.style.display = 'none');
+
+  // Always show the universal options for every item
+  const globalOpts = document.getElementById('global-opts');
+  if (globalOpts) globalOpts.style.display = 'grid';
+
+  if (Array.isArray(item.optionGroups)) {
+    item.optionGroups.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'grid';
+    });
+  }
+
+  document.querySelectorAll('.opt').forEach(o => o.classList.remove('sel'));
+  const noteEl = document.querySelector('#modal textarea');
+  if (noteEl) noteEl.value = '';
+
+  if (editingOrderItemIndex !== null && order[editingOrderItemIndex]) {
+    const existing = order[editingOrderItemIndex];
+    const existingMods = Array.isArray(existing.mods) ? existing.mods : [];
+
+    const visibleOpts = Array.from(document.querySelectorAll('.opts'))
+      .filter(group => group.style.display !== 'none')
+      .flatMap(group => Array.from(group.querySelectorAll('.opt')));
+
+    const usedMods = new Set();
+
+    visibleOpts.forEach(opt => {
+      const label = opt.textContent.trim();
+      if (existingMods.includes(label)) {
+        opt.classList.add('sel');
+        usedMods.add(label);
+      }
+    });
+
+    const leftover = existingMods.filter(m => !usedMods.has(m));
+    if (leftover.length && noteEl) {
+      noteEl.value = leftover.join(', ');
+    }
+  }
+
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function escapeHtml(str) {
+  str = String(str ?? '');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function updateOrder() {
+  const list = document.getElementById('order-list');
+  const discountBox = document.getElementById('discount-summary');
+  let subtotal = 0;
+
+  let mainCount = 0;
+  let drinkCount = 0;
+  let snackCount = 0;
+
+  if (!order.length) {
+    list.innerHTML = '<p class="empty-order">No items yet</p>';
+    if (discountBox) discountBox.textContent = '';
+  } else {
+    let html = '';
+    order.forEach((o, i) => {
+      subtotal += o.final; 
+      let name = o.displayName;
+
+    if (!o.isManualDiscount) {
+      if (o.cat === '咖喱系列' || o.cat === '茶記粉面' || o.cat === '主食') {
+        mainCount++;
+      } else if (o.cat === '飲品') {
+        drinkCount++;
+      } else if (o.cat === '小食' && !o.excludeFromComboB) {
+        snackCount++;
+      }
+    }
+
+      if (o.isSpaghetti) name = name.replace(/意粉/g,'<span class="red">意粉</span>');
+      if (o.swapToChicken) name = name.replace('豬扒','<span class="red">雞扒</span>');
+      if (o.swapToPork) name = name.replace('雞扒','<span class="red">豬扒</span>');
+      if (o.isLoMein) name = name.replace('撈粗','<span class="red">撈粗</span>');
+      if (o.isLoRamen) name = name.replace('撈拉麵','<span class="red">撈拉麵</span>');
+      if (o.isLoDing) name = name.replace('撈丁','<span class="red">撈丁</span>');
+      if (o.isSoupMein) name = name.replace('湯粗','<span class="red">湯粗</span>');
+      if (o.isSoupRamen) name = name.replace('湯拉麵','<span class="red">湯拉麵</span>');
+      if (o.isSoupDing) name = name.replace('湯丁','<span class="red">湯丁</span>');
+      if (o.isSoupVermicelli) name = name.replace('湯米','<span class="red">湯米</span>');
+      if (o.isSoupMacaroni) name = name.replace('湯通','<span class="red">湯通</span>');
+      if (o.isSoupSpaghetti) name = name.replace('湯意','<span class="red">湯意</span>');
+      if (o.isDing) name = name.replace('丁','<span class="red">丁</span>');
+      if (o.isSetMeal) {name += ' <span class="blue">餐</span>';}
+
+
+
+      const modsHtml = o.mods.length
+        ? `<small style="color:#666;">${o.mods.map(escapeHtml).join(', ')}</small>`
+        : '';
+
+      html += `
+        <div class="order-item">
+          <div class="info">
+            <div class="price-line">£${o.final.toFixed(2)}</div>
+            <div>${name}</div>
+            ${modsHtml}
+          </div>
+          <div class="order-actions">
+            <button class="edit-btn" data-index="${i}" aria-label="Edit item">
+              <i class="fas fa-pen"></i>
+            </button>
+            <button class="delete-btn" data-index="${i}" aria-label="Remove item">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    list.innerHTML = html;
+  }
+
+  let comboBCount = Math.min(mainCount, drinkCount, snackCount);
+  mainCount -= comboBCount;
+  drinkCount -= comboBCount;
+  let comboACount = Math.min(mainCount, drinkCount);
+
+  const mealDealDiscount = comboBCount * 1.0 + comboACount * 0.5;
+  const baseTotal = subtotal - mealDealDiscount;
+
+  let cashDiscount = 0;
+  let finalTotal = baseTotal;
+
+  if (isCash && baseTotal > 0) {
+    cashDiscount = baseTotal * 0.05;
+    finalTotal = baseTotal - cashDiscount;
+    finalTotal = Math.floor(finalTotal * 10) / 10;
+  }
+
+  lastBaseTotal = baseTotal;
+  lastFinalTotal = (isCash && finalTotal > 0) ? finalTotal : baseTotal;
+  lastSubtotal = subtotal;
+  lastComboACount = comboACount;
+  lastComboBCount = comboBCount;
+  lastMealDealDiscount = mealDealDiscount;
+  lastCashDiscount = cashDiscount;
+
+  if (discountBox) {
+    if (!order.length || (mealDealDiscount <= 0 && (!isCash || cashDiscount <= 0))) {
+      discountBox.textContent = '';
+    } else {
+      let lines = [];
+      if (comboACount > 0) {
+        lines.push(`Combo A x${comboACount}: -£${(comboACount * 0.5).toFixed(2)}`);
+      }
+      if (comboBCount > 0) {
+        lines.push(`Combo B x${comboBCount}: -£${(comboBCount * 1.0).toFixed(2)}`);
+      }
+      if (isCash && cashDiscount > 0) {
+        lines.push(`Cash 5%: -£${cashDiscount.toFixed(2)}`);
+      }
+      discountBox.innerHTML = lines.join('<br>');
+    }
+  }
+
+  const totalEl = document.getElementById('total');
+  if (isCash && finalTotal > 0) {
+    totalEl.textContent = '£' + finalTotal.toFixed(1);
+  } else {
+    totalEl.textContent = '£' + baseTotal.toFixed(2);
+  }
+
+  // ✅ keep Customer screen in sync
+  renderCustomerView();
+}
+
+document.getElementById('add').addEventListener('click', () => {
+  if (!current) {
+    alert('No item is selected – please close this window and click a menu item again.');
+    return;
+  }
+
+    const sel = Array.from(
+    document.querySelectorAll('#modal .opts')
+  )
+    .filter(group => group.style.display !== 'none')
+    .flatMap(group => Array.from(group.querySelectorAll('.opt.sel')));
+
+  const mods = sel.map(o => o.textContent.trim());
+  const noteEl = document.querySelector('#modal textarea');
+  const note = noteEl ? noteEl.value.trim() : '';
+  if (note) mods.push(note);
+
+  let name = current.baseName;
+  let price = current.price;
+  let isSpaghetti = false;
+  let isLoMein = false;
+  let isLoRamen = false;
+  let isLoDing = false;
+  let isSoupMein = false;
+  let isSoupRamen = false;
+  let isSoupDing = false;
+  let isSoupVermicelli = false;
+  let isSoupMacaroni = false;
+  let isSoupSpaghetti = false;
+  let isDing = false;
+  let swapToChicken = false;
+  let swapToPork = false;
+  let isSetMeal = false;
+  let addedSpringOnionLoCharge = false;
+
+  sel.forEach(opt => {
+    const v = opt.textContent.trim();
+    if (v === '意粉') {
+      name = name.replace('飯','意粉');
+      isSpaghetti = true;
+    }
+    if (v === '轉雞扒') {
+      name = name.replace('豬扒','雞扒');
+      swapToChicken = true;
+    }
+    if (v === '轉豬扒') {
+      name = name.replace('雞扒','豬扒');
+      swapToPork = true;
+    }
+    if (v === '撈粗' && current.loMeinName) {
+      name = current.loMeinName;
+      isLoMein = true;
+    }
+    if (v === '撈拉麵' && current.loRamenName) {
+      name = current.loRamenName;
+      isLoRamen = true;
+    }
+    if (v === '撈丁' && current.loDingName) {
+      name = current.loDingName;
+      isLoDing = true;
+    }
+    if (
+      !addedSpringOnionLoCharge &&
+      (v === '撈粗' || v === '撈丁') &&
+      (current.baseName === '蔥油雞扒煎蛋飯' ||
+       current.baseName === '蔥油豬扒煎蛋飯')
+    ) {
+      price += 1;
+      addedSpringOnionLoCharge = true;
+    }
+    if (v === '湯粗' && current.SoupMeinName) {
+      name = current.SoupMeinName;
+      isSoupMein = true;
+    }
+    if (v === '湯拉麵' && current.SoupRamenName) {
+      name = current.SoupRamenName;
+      isSoupRamen = true;
+    }
+    if (v === '湯丁' && current.SoupDingName) {
+      name = current.SoupDingName;
+      isSoupDing = true;
+    }
+    if (v === '湯米' && current.SoupVermicelliName) {
+      name = current.SoupVermicelliName;
+      isSoupVermicelli = true;
+    }
+    if (v === '湯通' && current.SoupMacaroniName) {
+      name = current.SoupMacaroniName;
+      isSoupMacaroni = true;
+    }
+    if (v === '湯意' && current.SoupSpaghettiName) {
+      name = current.SoupSpaghettiName;
+      isSoupSpaghetti = true;
+    }
+    if (v === '丁' && current.DingName) {
+      name = current.DingName;
+      isDing = true;
+    }
+    if ((v === '熱' || v === '凍') && current.isHotCold) {
+      name = v + name;
+    }
+    if (v === '餐') {
+      price += 2;
+      isSetMeal = true;
+    }
+  });
+
+  const newItem = {
+    displayName: name,
+    final: price,
+    mods,
+    isSpaghetti,
+    isLoMein,
+    isLoRamen,
+    isLoDing,
+    isSoupMein,
+    isSoupRamen,
+    isSoupDing,
+    isSoupVermicelli,
+    isSoupMacaroni,
+    isSoupSpaghetti,
+    isDing,
+    isSetMeal,
+    swapToChicken,
+    swapToPork,
+    cat: current.cat,
+    menuIndex: (typeof current.menuIndex === 'number') ? current.menuIndex : null,
+    excludeFromComboB: !!current.excludeFromComboB
+  };
+
+  // ✅ If editing an All Orders ticket item, save back into that ticket instead of POS order[]
+  if (editingTicketItem) {
+    const ticket = findTicketById(editingTicketItem.ticketId);
+    if (ticket) {
+      const arr = (editingTicketItem.lane === 'food') ? ticket.foodItems : ticket.drinkItems;
+      const old = arr && arr[editingTicketItem.index];
+
+      if (arr && old) {
+        // preserve status (complete/in-progress) and anything else not in newItem
+        arr[editingTicketItem.index] = {
+          ...old,
+          ...newItem,
+          status: old.status || 'in-progress'
+        };
+      }
+
+      // ✅ also update completedOrders record (for CSV/admin) if it exists
+      const summary = completedOrders.find(o => o.id === ticket.id);
+      if (summary) {
+        summary.items = [
+          ...(ticket.foodItems || []),
+          ...(ticket.drinkItems || [])
+        ].map(it => ({
+          name: it.displayName || it.name || '',
+          category: it.cat || '',
+          amount: Number(it.final ?? it.price ?? 0) || 0
+        }));
+      }
+    }
+
+    // cleanup + refresh views
+    editingTicketItem = null;
+    editingOrderItemIndex = null;
+
+    document.getElementById('modal').style.display = 'none';
+    current = null;
+
+    renderKitchenView();
+    renderBarView();
+    renderAllOrdersView();
+    if (adminUnlocked) renderAdminView();
+
+    return;
+  }
+
+  if (editingOrderItemIndex !== null && typeof editingOrderItemIndex === 'number') {
+    order[editingOrderItemIndex] = newItem;
+  } else {
+    order.push(newItem);
+  }
+
+  editingOrderItemIndex = null;
+  updateOrder();
+  document.getElementById('modal').style.display = 'none';
+  current = null;
+});
+
+document.getElementById('cancel').addEventListener('click', () => {
+  document.getElementById('modal').style.display = 'none';
+  current = null;
+  editingOrderItemIndex = null;
+  editingTicketItem = null;
+});
+
+// Menu click delegation with direct-add logic
+document.getElementById('menu-content').addEventListener('click', e => {
+  const card = e.target.closest('.item');
+  if (!card) return;
+
+  const index = parseInt(card.dataset.index, 10);
+  if (Number.isNaN(index)) return;
+
+  const item = menu[index];
+
+  const isDirectCategory = DIRECT_ADD_CATEGORIES.includes(item.cat);
+  const isDirectDrink = DIRECT_ADD_DRINKS.includes(item.name);
+
+  if (isDirectCategory || isDirectDrink) {
+    order.push({
+      displayName: item.name,
+      final: item.price,
+      mods: [],
+      cat: item.cat,
+      menuIndex: index,
+      isManualDiscount: item.isManualDiscount || false,
+      excludeFromComboB: !!item.excludeFromComboB
+    });
+    updateOrder();
+  } else {
+    editingOrderItemIndex = null;
+    openModal(item, index);
+  }
+});
+
+// Order delete delegation
+document.getElementById('order-list').addEventListener('click', e => {
+  const btn = e.target.closest('.delete-btn');
+  if (!btn) return;
+
+  const idx = parseInt(btn.dataset.index, 10);
+  if (Number.isNaN(idx)) return;
+
+  order.splice(idx, 1);
+  updateOrder();
+});
+
+// Order edit delegation
+document.getElementById('order-list').addEventListener('click', e => {
+  const btn = e.target.closest('.edit-btn');
+  if (!btn) return;
+
+  const idx = parseInt(btn.dataset.index, 10);
+  if (Number.isNaN(idx)) return;
+
+  const item = order[idx];
+  if (!item) return;
+
+  editingOrderItemIndex = idx;
+
+  let menuIndex = (typeof item.menuIndex === 'number') ? item.menuIndex : -1;
+
+  if (menuIndex < 0) {
+    const baseName = item.displayName.replace(/^(熱|凍)/, '');
+    menuIndex = menu.findIndex(m => m.name === baseName);
+  }
+
+  if (menuIndex < 0) {
+    alert('Cannot edit this item (no matching menu entry found).');
+    editingOrderItemIndex = null;
+    return;
+  }
+
+  const menuItem = menu[menuIndex];
+  openModal(menuItem, menuIndex);
+});
+
+// Options click behaviour
+document.querySelectorAll('.opt').forEach(o => {
+  o.addEventListener('click', () => {
+    const parent = o.parentElement;
+    if (parent && parent.id === 'hot-cold-opts') {
+      parent.querySelectorAll('.opt').forEach(sib => sib.classList.remove('sel'));
+      o.classList.add('sel');
+    } else {
+      o.classList.toggle('sel');
+    }
+  });
+});
+
+const payBtn = document.getElementById('pay-btn');
+const payModal = document.getElementById('pay-modal');
+const amountDueEl = document.getElementById('amount-due');
+const amountInput = document.getElementById('amount-received');
+const changeEl = document.getElementById('change-amount');
+const payCancel = document.getElementById('pay-cancel');
+const payConfirm = document.getElementById('pay-confirm');
+const cardBtn = document.getElementById('card-btn');
+
+const platformBtn = document.getElementById('platform-btn');
+const orderTypeSelect = document.getElementById('order-type');
+
+function isPlatformOrder() {
+  const v = orderTypeSelect ? orderTypeSelect.value : '';
+  return v === 'deliveroo' || v === 'justeat';
+}
+
+function syncPayButtonsByType() {
+  const cardBtn = document.getElementById('card-btn');
+  const cashBtn = document.getElementById('pay-btn'); // your cash button id
+  if (!cardBtn || !cashBtn) return;
+
+  const platform = isPlatformOrder(); // deliveroo / justeat
+
+  cardBtn.disabled = platform;
+  cashBtn.disabled = platform;
+
+  cardBtn.style.opacity = platform ? '0.5' : '1';
+  cashBtn.style.opacity = platform ? '0.5' : '1';
+}
+
+function syncPlatformBtnState() {
+  if (!platformBtn) return;
+  const on = isPlatformOrder();
+  platformBtn.disabled = !on;
+  platformBtn.style.opacity = on ? '1' : '0.5';
+}
+
+const unpaidBtn = document.getElementById('unpaid-btn');
+
+function canUnpaidOrder() {
+  const v = orderTypeSelect ? orderTypeSelect.value : '';
+  return v === 'dine-in' || v === 'onsite' || v === 'tel';
+}
+
+function syncUnpaidBtnState() {
+  if (!unpaidBtn) return;
+  const on = canUnpaidOrder();
+  unpaidBtn.disabled = !on;
+  unpaidBtn.style.opacity = on ? '1' : '0.5';
+}
+
+// ✅ Initial state (run AFTER unpaidBtn exists)
+syncUnpaidBtnState();
+syncPayButtonsByType();
+syncPlatformBtnState();
+
+// make sure both Add + Unpaid update when type changes
+if (orderTypeSelect) {
+  orderTypeSelect.addEventListener('change', () => {
+    syncPlatformBtnState();
+    syncUnpaidBtnState();
+    syncPayButtonsByType();   // ✅ add this
+  });
+}
+syncUnpaidBtnState();
+
+// ----------------------
+// Cash pay button (opens popup)
+// ----------------------
+payBtn.addEventListener('click', () => {
+  if (!order.length) {
+    alert('No items in the order.');
+    return;
+  }
+
+  // ✅ Auto apply cash discount + show “Cash 5%” line in summary
+  isCash = true;
+
+  // keep the header toggle button visually in sync (optional)
+  const cashBtnEl = document.getElementById('cash-btn');
+  if (cashBtnEl) cashBtnEl.classList.add('active');
+
+  updateOrder(); // so “Cash 5%: -£x.xx” shows before popup
+  renderCustomerView();
+
+  // cash total shown with 1 decimal
+  amountDueEl.textContent = '£' + lastFinalTotal.toFixed(1);
+
+  amountInput.value = '';
+  changeEl.textContent = '£0.00';
+  changeEl.parentElement.classList.remove('negative');
+
+  payModal.style.display = 'flex';
+  amountInput.focus();
+});
+
+// live change calculation for cash popup
+amountInput.addEventListener('input', () => {
+  const val = parseFloat(amountInput.value);
+
+  if (isNaN(val)) {
+    changeEl.textContent = '£0.00';
+    changeEl.parentElement.classList.remove('negative');
+    return;
+  }
+
+  const change = val - lastFinalTotal;
+  changeEl.textContent = '£' + change.toFixed(2);
+
+  if (change < 0) {
+    changeEl.parentElement.classList.add('negative');
+  } else {
+    changeEl.parentElement.classList.remove('negative');
+  }
+});
+
+// ✅ Quick cash preset buttons (MOVED OUTSIDE so it works immediately)
+document.querySelectorAll('#pay-modal .preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => { 
+
+const v = btn.dataset.val;
+
+    if (v === 'exact') {
+      amountInput.value = String(lastFinalTotal.toFixed(2));
+    } else {
+      amountInput.value = v;
+    }
+
+    // Trigger existing change calculation
+    amountInput.dispatchEvent(new Event('input'));
+    amountInput.focus();
+  });
+});
+
+payCancel.addEventListener('click', () => {
+  payModal.style.display = 'none';
+
+  // revert cash mode if payment cancelled
+  isCash = false;
+  const cashBtnEl = document.getElementById('cash-btn');
+  if (cashBtnEl) cashBtnEl.classList.remove('active');
+  updateOrder();
+  renderCustomerView();
+});
+
+// confirm cash payment → uses finalizeOrder('cash')
+payConfirm.addEventListener('click', () => {
+  const val = parseFloat(amountInput.value);
+  if (isNaN(val)) {
+    alert('Please enter the cash received.');
+    return;
+  }
+
+  const change = val - lastFinalTotal;
+  if (change < 0) {
+    alert('Cash received is not enough.');
+    return;
+  }
+
+  finalizeOrder('cash');
+});
+
+// ----------------------
+// Shared finalise logic (cash + card)
+// ----------------------
+function finalizeOrder(paymentMethod, overrideTotal = null) {
+  // If we are paying an existing Unpaid ticket, do NOT create a new kitchen ticket
+  if (payingOrderId) {
+    payExistingTicket(paymentMethod, overrideTotal);
+    return;
+  }
+
+  if (!order.length) {
+    alert('No items in the order.');
+    return;
+  }
+
+  // Card/platform should not apply cash discount
+  if (paymentMethod === 'card' || paymentMethod === 'deliveroo' || paymentMethod === 'justeat') {
+    isCash = false;
+    updateOrder();
+  }
+
+  const orderNumberInput = document.getElementById('order-number');
+  const pickupInput = document.getElementById('pickup-time');
+
+  const rawTable = orderNumberInput ? orderNumberInput.value.trim() : '';
+  const orderNumber = rawTable || `#${nextOrderId++}`;
+
+  const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
+
+  let channel = pickupInput ? pickupInput.value.trim() : '';
+  if (channel.length >= 5) channel = channel.slice(0, 5);
+
+  const now = new Date();
+  const createdAt = now.toISOString();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  const orderId = now.getTime();
+
+  const foodCats = ['咖喱系列', '茶記粉面', '主食', '小食'];
+
+  const foodItems = order
+    .filter(item => foodCats.includes(item.cat))
+    .map(item => ({ ...item, status: 'in-progress', clientKey: item.clientKey || genClientKey() }));
+
+  const drinkItems = order
+    .filter(item => item.cat === '飲品')
+    .map(item => ({ ...item, status: 'in-progress', clientKey: item.clientKey || genClientKey() }));
+
+  const paidTotal = (typeof overrideTotal === 'number') ? overrideTotal : lastFinalTotal;
+
+  const ticket = {
+    id: orderId,
+    orderNumber,
+    serviceType,
+    channel,
+    time: timeStr,
+    createdAt,
+
+    paymentStatus: 'paid',
+    paymentMethod,
+    paidAt: createdAt,
+
+    amount: paidTotal,
+    foodItems,
+    drinkItems
+  };
+
+  kitchenOrders.push(ticket);
+saveTicketToSupabase(ticket).catch(console.error);
+
+// Record to CSV source (paid orders only) — now includes item lines
+completedOrders.push({
+  id: orderId,
+  orderNumber,
+  serviceType,
+  channel,
+  createdAt,
+  completedAt: null,
+  paidAt: createdAt,
+  paymentMethod,
+  total: paidTotal,
+
+  // ✅ NEW: store items for CSV + admin pivot
+  items: [
+    ...(foodItems || []),
+    ...(drinkItems || [])
+  ].map(it => ({
+    name: it.displayName || it.name || '',
+    category: it.cat || '',          // e.g. 咖喱系列 / 飲品 / 主食...
+    amount: Number(it.final ?? it.price ?? 0) || 0
+  }))
+});
+
+  // clear POS
+  order = [];
+  isCash = false;
+  payingOrderId = null;
+  updateOrder();
+
+  if (orderNumberInput) orderNumberInput.value = '';
+  if (pickupInput) pickupInput.value = '';
+
+  payModal.style.display = 'none';
+
+  renderKitchenView();
+  renderBarView();
+  renderAllOrdersView();
+
+if (adminUnlocked) renderAdminView();
+}
+
+// ----------------------
+// Card button (NO popup) – just finalise immediately
+// ----------------------
+if (cardBtn) {
+  cardBtn.addEventListener('click', () => {
+    // allow paying an existing unpaid ticket even if POS draft is empty
+    if (!order.length && !payingOrderId) {
+      alert('No items in the order.');
+      return;
+    }
+
+    isCash = false;
+    updateOrder();
+    finalizeOrder('card');
+  });
+}
+
+if (unpaidBtn) {
+  unpaidBtn.addEventListener('click', createUnpaidTicketFromCurrentOrder);
+}
+
+if (platformBtn) {
+  platformBtn.addEventListener('click', () => {
+    if (!order.length) {
+      alert('No items in the order.');
+      return;
+    }
+
+    if (!isPlatformOrder()) {
+      alert('This button is only for Deliveroo / Just Eat orders.');
+      return;
+    }
+
+    // ✅ No popup – use POS-calculated total
+    isCash = false;
+    const cashBtnEl = document.getElementById('cash-btn');
+    if (cashBtnEl) cashBtnEl.classList.remove('active');
+    updateOrder();
+    finalizeOrder(orderTypeSelect.value, lastFinalTotal);
+  });
+}
+
+async function saveTicketToSupabase(ticket) {
+  if (!supabase) return;
+  const ok = await ensureSupabaseLogin();
+  if (!ok) return;
+
+  const orderRow = {
+    id: ticket.id,
+    order_number: ticket.orderNumber,
+    service_type: ticket.serviceType,
+    channel: ticket.channel || '',
+    time_text: ticket.time || '',
+    payment_status: ticket.paymentStatus || 'pending',
+    payment_method: ticket.paymentMethod || null,
+    amount: Number(ticket.amount || 0),
+    created_at: ticket.createdAt || new Date().toISOString(),
+    completed_at: ticket.completedAt || null,
+    paid_at: ticket.paidAt || null
+  };
+
+  // Upsert order row
+  const { error: oErr } = await supabase
+    .from('orders')
+    .upsert(orderRow, { onConflict: 'id' });
+
+  if (oErr) { console.error(oErr); alert('Save order failed'); return; }
+
+  // Ensure every item has a stable clientKey
+  const allFood = (ticket.foodItems || []).map(it => ({ ...it, kind: 'food' }));
+  const allDrink = (ticket.drinkItems || []).map(it => ({ ...it, kind: 'drink' }));
+  const all = [...allFood, ...allDrink];
+
+  const itemRows = all.map(it => {
+    if (!it.clientKey) it.clientKey = genClientKey();
+    return {
+      order_id: ticket.id,
+      kind: it.kind,
+      client_key: it.clientKey,
+      name: it.displayName || it.name || '',
+      category: it.cat || '',
+      price: Number(it.final ?? it.price ?? 0) || 0,
+      mods: Array.isArray(it.mods) ? it.mods : [],
+      status: it.status || 'in-progress',
+      menu_index: (typeof it.menuIndex === 'number') ? it.menuIndex : null,
+      exclude_from_combo_b: !!it.excludeFromComboB,
+      is_set_meal: !!it.isSetMeal
+    };
+  });
+
+  // Insert new items (ignore duplicates if re-saving same ticket)
+  const { error: iErr } = await supabase
+    .from('order_items')
+    .upsert(itemRows, { onConflict: 'client_key' });
+
+  if (iErr) { console.error(iErr); alert('Save items failed'); }
+}
+
+// ----------------------
+// Tab switching (uses data-tab, not data-view)
+// ----------------------
+function switchToView(viewId) {
+  // Admin lock (only if switching to admin)
+  if (viewId === 'admin-view') {
+    if (!adminUnlocked) {
+      const pw = prompt('Enter Admin password:');
+      if (pw !== ADMIN_PASSWORD) return; // stop switch
+      adminUnlocked = true;
+    }
+  } else {
+    // auto-lock admin when leaving Admin
+    adminUnlocked = false;
+  }
+
+  // Tab active state
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.querySelector(`.tab[data-tab="${viewId}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // Show/hide views
+  const views = ['pos-view', 'kitchen-view', 'bar-view', 'all-orders-view', 'customer-view', 'admin-view', 'waitlist-view'];
+  views.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = (id === viewId) ? (id === 'pos-view' ? 'flex' : 'block') : 'none';
+  });
+
+  // Render the view if needed
+  if (viewId === 'customer-view') renderCustomerView();
+  if (viewId === 'waitlist-view') renderWaitlist();
+  if (viewId === 'admin-view') renderAdminView();
+  if (viewId === 'kitchen-view') renderKitchenView();
+  if (viewId === 'bar-view') renderBarView();
+  if (viewId === 'all-orders-view') renderAllOrdersView();
+}
+
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const viewId = btn.dataset.tab; // ✅ correct attribute
+    if (!viewId) return;
+    switchToView(viewId);
+  });
+});
+
+// ----------------------
+// Kitchen/bar ticket line renderer (with Complete button)
+// ----------------------
+function renderTicketItemLine(item, orderId, index, kind) {
+  const modsArray = Array.isArray(item.mods) ? item.mods : [];
+  const modsHtml = modsArray.length
+    ? `<div class="ticket-mods">${modsArray.join(', ')}</div>`
+    : '';
+
+  const isDone = item.status === 'complete';
+
+  let name = item.displayName || '';
+  if (item.isSetMeal) {
+    name += ' <span class="blue">餐</span>';
+  }
+
+  return `
+    <div class="ticket-item ${isDone ? 'done' : ''}">
+      <div class="ticket-item-main">
+        <div class="ticket-item-name">${name}</div>
+        ${modsHtml}
+      </div>
+      <button
+        type="button"
+        class="ticket-status-btn ${isDone ? 'done' : ''}"
+        data-order-id="${orderId}"
+        data-index="${index}"
+        data-kind="${kind}"
+      >
+        ${isDone ? 'Done' : 'Complete'}
+      </button>
+    </div>
+  `;
+}
+
+// ----------------------
+// Kitchen view (food only)
+// ----------------------
+function renderKitchenView() {
+  const wrap = document.getElementById('kitchen-orders');
+  if (!wrap) return;
+
+  let html = '';
+
+  kitchenOrders.forEach(orderObj => {
+    if (!orderObj.foodItems || !orderObj.foodItems.length) return;
+
+const ticketClass =
+  orderObj.serviceType === 'deliveroo' ? 'ticket ticket-deliveroo' :
+  orderObj.serviceType === 'justeat'   ? 'ticket ticket-justeat'   :
+  orderObj.serviceType === 'onsite'    ? 'ticket ticket-onsite'    :
+  orderObj.serviceType === 'tel'       ? 'ticket ticket-tel'       :
+  'ticket';
+
+    html += `
+      <div class="${ticketClass}">
+        <div class="ticket-header">
+          <span><strong>${orderObj.orderNumber}</strong></span>
+          <span class="badge">${
+            orderObj.serviceType === 'dine-in'  ? '堂食' :
+            orderObj.serviceType === 'onsite'   ? '現場外賣'  :
+            orderObj.serviceType === 'tel'      ? '電話外賣' :
+            orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
+            orderObj.serviceType === 'justeat'  ? 'Just Eat' :
+            orderObj.serviceType || ''
+          }</span>
+          ${
+            orderObj.channel
+              ? `<span class="badge">Pickup ${orderObj.channel}</span>`
+              : ''
+          }
+          <span>${orderObj.time}</span>
+        </div>
+        <div class="ticket-body">
+          ${
+           orderObj.foodItems
+             .map((item, idx) => renderTicketItemLine(item, orderObj.id, idx, 'food'))
+             .join('')
+           }
+         </div>
+       </div>
+    `;
+  });
+
+  wrap.innerHTML = html || '<p style="text-align:center;color:#999;">No kitchen orders</p>';
+}
+
+// ----------------------
+// Bar view (drinks only)
+// ----------------------
+function renderBarView() {
+  const wrap = document.getElementById('bar-orders');
+  if (!wrap) return;
+
+  let html = '';
+
+  kitchenOrders.forEach(orderObj => {
+    if (!orderObj.drinkItems || !orderObj.drinkItems.length) return;
+
+const ticketClass =
+  orderObj.serviceType === 'deliveroo' ? 'ticket ticket-deliveroo' :
+  orderObj.serviceType === 'justeat'   ? 'ticket ticket-justeat'   :
+  orderObj.serviceType === 'onsite'    ? 'ticket ticket-onsite'    :
+  orderObj.serviceType === 'tel'       ? 'ticket ticket-tel'       :
+  'ticket';
+
+    html += `
+      <div class="${ticketClass}">
+        <div class="ticket-header">
+          <span><strong>${orderObj.orderNumber}</strong></span>
+          <span class="badge">${
+            orderObj.serviceType === 'dine-in'  ? '堂食' :
+            orderObj.serviceType === 'onsite'   ? '現場外賣'  :
+            orderObj.serviceType === 'tel'      ? '電話外賣' :
+            orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
+            orderObj.serviceType === 'justeat'  ? 'Just Eat' :
+            orderObj.serviceType || ''
+          }</span>
+          ${
+            orderObj.channel
+              ? `<span class="badge">Pickup ${orderObj.channel}</span>`
+              : ''
+          }
+          <span>${orderObj.time}</span>
+        </div>
+        <div class="ticket-body">
+          ${
+            orderObj.drinkItems
+             .map((item, idx) => renderTicketItemLine(item, orderObj.id, idx, 'drink'))
+             .join('')
+           }
+        </div>
+       </div>
+    `;
+  });
+
+  wrap.innerHTML = html || '<p style="text-align:center;color:#999;">No bar orders</p>';
+}
+
+// ----------------------
+// ALL ORDERS view (overview, NO complete buttons)
+// + Retrieve button for archived orders
+// ----------------------
+function renderAllOrdersView() {
+  const wrap = document.getElementById('all-orders');
+  if (!wrap) return;
+
+  let html = '';
+
+function getTicketClass(orderObj) {
+  if (orderObj.serviceType === 'deliveroo') return 'ticket ticket-deliveroo';
+  if (orderObj.serviceType === 'justeat')   return 'ticket ticket-justeat';
+  if (orderObj.serviceType === 'onsite')    return 'ticket ticket-onsite';
+  if (orderObj.serviceType === 'tel')       return 'ticket ticket-tel';
+  return 'ticket';
+}
+
+  function renderStatusBadgeType(orderObj) {
+    return orderObj.serviceType === 'dine-in'  ? '堂食' :
+           orderObj.serviceType === 'onsite'   ? '現場外賣'  :
+           orderObj.serviceType === 'tel'      ? '電話外賣' :
+           orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
+           orderObj.serviceType === 'justeat'  ? 'Just Eat' :
+           orderObj.serviceType || '';
+  }
+
+    function renderOverviewCard(orderObj, statusLabel, isArchived) {
+    const allItems = [];
+
+    (orderObj.foodItems || []).forEach((item, idx) => {
+      allItems.push({ item, kind: 'food', index: idx });
+    });
+    (orderObj.drinkItems || []).forEach((item, idx) => {
+      allItems.push({ item, kind: 'drink', index: idx });
+    });
+
+    if (!allItems.length) return '';
+
+    const isPendingPay = (orderObj.paymentStatus === 'pending');
+
+    const paymentBadge = isPendingPay
+      ? `<span class="badge badge-pending">Pending for payment</span>`
+      : `<span class="badge badge-paid">Paid</span>`;
+
+    const payBtnHtml = isPendingPay
+      ? `<button type="button" class="pay-pending-btn" data-order-id="${orderObj.id}">Pay</button>`
+      : '';
+
+    const itemsHtml = allItems.map(entry => {
+      const it   = entry.item;
+      const kind = entry.kind;
+      const idx  = entry.index;
+
+      const modsArray = Array.isArray(it.mods) ? it.mods : [];
+      const modsHtml = modsArray.length
+        ? `<div class="ticket-mods">${modsArray.join(', ')}</div>`
+        : '';
+
+      let name = it.displayName || '';
+      if (it.isSetMeal) name += ' <span class="blue">餐</span>';
+
+      const isComplete = it.status === 'complete';
+      const itemClass = isComplete ? 'ticket-item done' : 'ticket-item';
+
+      const retrieveBtnHtml = isComplete
+        ? `<button
+             type="button"
+             class="retrieve-btn"
+             data-order-id="${orderObj.id}"
+             data-kind="${kind}"
+             data-index="${idx}"
+             data-archived="${isArchived ? '1' : '0'}"
+           >Retrieve</button>`
+        : '';
+
+      const editBtnHtml = (!isArchived)
+        ? `
+          <button
+            type="button"
+            class="edit-btn ticket-edit-btn"
+            title="Edit"
+            data-ticket-id="${orderObj.id}"
+            data-kind="${kind}"
+            data-index="${idx}"
+            data-archived="0"
+          >
+            <i class="fas fa-pen"></i>
+          </button>
+        `
+        : '';
+
+      return `
+        <div class="${itemClass}">
+          <div class="ticket-item-main">
+            <div class="ticket-item-name">${name}</div>
+            ${modsHtml}
+          </div>
+          <div class="ticket-item-actions">
+            ${editBtnHtml}
+            ${retrieveBtnHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="${getTicketClass(orderObj)}">
+        <div class="ticket-header">
+          <span><strong>${orderObj.orderNumber}</strong></span>
+          <span class="badge">${statusLabel}</span>
+          <span class="badge">${renderStatusBadgeType(orderObj)}</span>
+
+          ${paymentBadge}
+          ${payBtnHtml}
+
+          ${orderObj.channel ? `<span class="badge">Pickup ${orderObj.channel}</span>` : ''}
+          <span>${orderObj.time}</span>
+        </div>
+
+        <div class="ticket-body">
+          ${itemsHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  // Active (still in kitchenOrders)
+  kitchenOrders.forEach(o => {
+    html += renderOverviewCard(o, 'In progress', false);
+  });
+
+  // Fully completed / archived
+  archivedOrders.forEach(o => {
+    html += renderOverviewCard(o, 'Completed', true);
+  });
+
+  wrap.innerHTML = html || '<p style="text-align:center;color:#999;">No orders</p>';
+}
+
+function bucketFromCategory(cat) {
+  const c = String(cat || '');
+  if (c.includes('飲品')) return 'drink';
+  if (c.includes('小食')) return 'snack';
+  return 'food';
+}
+
+function buildBucketPivot(itemRows) {
+  const buckets = { food: [], drink: [], snack: [] };
+
+  itemRows.forEach(r => {
+    const b = bucketFromCategory(r.category);
+    buckets[b].push(r);
+  });
+
+  // Sort each bucket by qty desc
+  Object.keys(buckets).forEach(k => {
+    buckets[k].sort((a, b) => b.qty - a.qty);
+  });
+
+  return buckets;
+}
+
+function renderAdminView() {
+  const wrap = document.getElementById('admin-summary');
+  const dateInput = document.getElementById('admin-date');
+  if (!wrap || !dateInput) return;
+
+  // default date = today
+  if (!dateInput.value) {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    dateInput.value = `${yyyy}-${mm}-${dd}`;
+  }
+
+  const selected = dateInput.value; // yyyy-mm-dd
+
+  // filter by paidAt date (local)
+  const todays = completedOrders.filter(o => {
+    const iso = o.paidAt || o.createdAt || '';
+    if (!iso) return false;
+    const d = new Date(iso);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}` === selected;
+  });
+
+  // ✅ Build item pivot: { "item name": { qty, amount } }
+const itemMap = new Map();
+
+todays.forEach(o => {
+  const items = Array.isArray(o.items) ? o.items : [];
+  items.forEach(it => {
+    const key = (it.name || '').trim();
+    if (!key) return;
+
+    const prev = itemMap.get(key) || { qty: 0, amount: 0, category: it.category || '' };
+    prev.qty += 1;
+    prev.amount += (Number(it.amount || 0) || 0);
+    if (!prev.category && it.category) prev.category = it.category;
+    itemMap.set(key, prev);
+  });
+});
+
+// turn into sorted array (most sold first)
+const itemRows = Array.from(itemMap.entries())
+  .map(([name, v]) => ({ name, qty: v.qty, amount: v.amount, category: v.category || '' }))
+  .sort((a, b) => b.qty - a.qty);
+
+const buckets = buildBucketPivot(itemRows);
+
+  const sum = {
+    cash: 0,
+    card: 0,
+    deliveroo: 0,
+    justeat: 0,
+    total: 0
+  };
+
+  todays.forEach(o => {
+    const amt = Number(o.total || 0) || 0;
+    sum.total += amt;
+
+    const m = (o.paymentMethod || '').toLowerCase();
+    if (m === 'cash') sum.cash += amt;
+    else if (m === 'card') sum.card += amt;
+    else if (m === 'deliveroo') sum.deliveroo += amt;
+    else if (m === 'justeat') sum.justeat += amt;
+  });
+
+wrap.innerHTML = `
+  <!-- ===== Summary cards ===== -->
+  <div class="ticket-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px;">
+    <div class="ticket">
+      <div class="ticket-header">Cash</div>
+      <div class="ticket-body"><strong>£${sum.cash.toFixed(2)}</strong></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-header">Card</div>
+      <div class="ticket-body"><strong>£${sum.card.toFixed(2)}</strong></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-header">Deliveroo</div>
+      <div class="ticket-body"><strong>£${sum.deliveroo.toFixed(2)}</strong></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-header">Just Eat</div>
+      <div class="ticket-body"><strong>£${sum.justeat.toFixed(2)}</strong></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-header">Total</div>
+      <div class="ticket-body"><strong>£${sum.total.toFixed(2)}</strong></div>
+    </div>
+  </div>
+
+  <!-- ===== Today’s Item Sales (FULL WIDTH, BELOW GRID) ===== -->
+  <!-- ===== Today’s Item Sales (TABLES ONLY) ===== -->
+  <div class="ticket" style="margin-top:16px;">
+    <div class="ticket-header"><strong>Today’s Item Sales</strong></div>
+    <div class="ticket-body">
+
+      ${itemRows.length ? `
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:16px;">
+
+          <!-- Food -->
+          <div>
+            <div style="font-weight:800; margin-bottom:8px;">Food</div>
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; font-weight:700; border-bottom:1px solid #ddd; padding-bottom:6px;">
+              <div>Item</div><div>Qty</div><div>£</div>
+            </div>
+            ${buckets.food.map(r => `
+              <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+                <div>${r.name}</div>
+                <div>${r.qty}</div>
+                <div>£${r.amount.toFixed(2)}</div>
+              </div>
+            `).join('') || `<div style="color:#777; padding:8px 0;">No food items</div>`}
+          </div>
+
+          <!-- Drinks -->
+          <div>
+            <div style="font-weight:800; margin-bottom:8px;">Drinks</div>
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; font-weight:700; border-bottom:1px solid #ddd; padding-bottom:6px;">
+              <div>Item</div><div>Qty</div><div>£</div>
+            </div>
+            ${buckets.drink.map(r => `
+              <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+                <div>${r.name}</div>
+                <div>${r.qty}</div>
+                <div>£${r.amount.toFixed(2)}</div>
+              </div>
+            `).join('') || `<div style="color:#777; padding:8px 0;">No drink items</div>`}
+          </div>
+
+          <!-- Snacks -->
+          <div>
+            <div style="font-weight:800; margin-bottom:8px;">Snacks</div>
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; font-weight:700; border-bottom:1px solid #ddd; padding-bottom:6px;">
+              <div>Item</div><div>Qty</div><div>£</div>
+            </div>
+            ${buckets.snack.map(r => `
+              <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+                <div>${r.name}</div>
+                <div>${r.qty}</div>
+                <div>£${r.amount.toFixed(2)}</div>
+              </div>
+            `).join('') || `<div style="color:#777; padding:8px 0;">No snack items</div>`}
+          </div>
+
+        </div>
+      ` : `
+        <div style="color:#777;">No paid orders for this date.</div>
+      `}
+
+    </div>
+  </div>
+
+  <p style="color:#666;margin-top:10px;">
+    Orders counted: <strong>${todays.length}</strong>
+  </p>
+`;
+}
+
+// ----------------------
+// Kitchen/bar Complete button handler
+// ----------------------
+function handleTicketClick(e) {
+  const btn = e.target.closest('.ticket-status-btn');
+  if (!btn) return;
+
+  const orderId = Number(btn.dataset.orderId);
+  const index   = Number(btn.dataset.index);
+  const kind    = btn.dataset.kind;
+
+  if (!orderId || Number.isNaN(index)) return;
+
+  const orderObj = kitchenOrders.find(o => o.id === orderId);
+  if (!orderObj) return;
+
+  const items = (kind === 'food') ? orderObj.foodItems : orderObj.drinkItems;
+  const item  = items[index];
+  if (!item) return;
+
+  // Toggle status
+  item.status = (item.status === 'complete') ? 'in-progress' : 'complete';
+if (supabase && item.clientKey) {
+  supabase
+    .from('order_items')
+    .update({ status: item.status })
+    .eq('client_key', item.clientKey);
+}
+
+  const allFoodDone  = !orderObj.foodItems.length || orderObj.foodItems.every(i => i.status === 'complete');
+  const allDrinkDone = !orderObj.drinkItems.length || orderObj.drinkItems.every(i => i.status === 'complete');
+
+// If everything is complete → move order to archivedOrders and stamp completion time
+if (allFoodDone && allDrinkDone) {
+  const completionTime = new Date().toISOString();
+
+  // remove from active
+  kitchenOrders = kitchenOrders.filter(o => o.id !== orderId);
+
+  // store in archivedOrders with completion timestamp
+  orderObj.completedAt = completionTime;
+  archivedOrders.push(orderObj);
+if (supabase) {
+  supabase
+    .from('orders')
+    .update({ completed_at: completionTime })
+    .eq('id', orderId);
+}
+
+  // also attach completion time to completedOrders entry for CSV
+  const summary = completedOrders.find(o => o.id === orderId);
+  if (summary) {
+    summary.completedAt = completionTime;
+  }
+}
+
+  renderKitchenView();
+  renderBarView();
+  renderAllOrdersView();
+}
+
+// kitchen & bar listen for Complete/Done
+document.getElementById('kitchen-orders').addEventListener('click', handleTicketClick);
+document.getElementById('bar-orders').addEventListener('click', handleTicketClick);
+
+// All orders click delegation: Pay (whole order) + Retrieve (per item)
+document.getElementById('all-orders').addEventListener('click', e => {
+
+  // ✅ EDIT (per item) in All Orders
+  const editBtn = e.target.closest('.ticket-edit-btn');
+  if (editBtn) {
+    const orderId = Number(editBtn.dataset.ticketId);
+    const index = Number(editBtn.dataset.index);
+    const kind = editBtn.dataset.kind; // 'food' or 'drink'
+    const isArchived = editBtn.dataset.archived === '1';
+
+    if (!orderId || Number.isNaN(index)) return;
+
+    const collection = isArchived ? archivedOrders : kitchenOrders;
+    const ticket = collection.find(o => o.id === orderId);
+    if (!ticket) return;
+
+    const items = (kind === 'food') ? ticket.foodItems : ticket.drinkItems;
+    const it = items[index];
+    if (!it) return;
+
+    // remember what we are editing (so modal saves back to ticket item)
+    editingTicketItem = { ticketId: ticket.id, lane: kind, index };
+
+    // find matching menu item to open correct option groups
+    let menuIndex = (typeof it.menuIndex === 'number') ? it.menuIndex : -1;
+    if (menuIndex < 0) {
+      const baseName = (it.displayName || '').replace(/^(熱|凍)/, '');
+      menuIndex = menu.findIndex(m => m.name === baseName);
+    }
+    if (menuIndex < 0) {
+      alert('Cannot edit this item (no matching menu entry found).');
+      editingTicketItem = null;
+      return;
+    }
+
+    // open the SAME modal you already use
+    editingOrderItemIndex = null; // important: do NOT edit current POS order[]
+    openModal(menu[menuIndex], menuIndex);
+    return;
+  }  
+
+// ✅ PAY (whole order)
+  const payBtn = e.target.closest('.pay-pending-btn');
+  if (payBtn) {
+    const orderId = Number(payBtn.dataset.orderId);
+    if (!orderId) return;
+
+    const ticket = findTicketById(orderId);
+    if (!ticket) return;
+
+    // Load ticket into POS for cashier to take payment
+    order = [
+      ...(ticket.foodItems || []),
+      ...(ticket.drinkItems || [])
+    ].map(it => ({
+      ...it,
+      mods: Array.isArray(it.mods) ? it.mods : [],
+      final: Number(it.final ?? it.price ?? 0)
+    }));
+
+    payingOrderId = ticket.id;
+
+    // Switch to POS tab
+    document.querySelector('[data-tab="pos-view"]').click();
+
+    isCash = false;
+    updateOrder();
+    renderCustomerView();
+    return; // IMPORTANT: stop here so it doesn't run Retrieve logic
+  }
+
+  // ✅ RETRIEVE (per item)
+  const btn = e.target.closest('.retrieve-btn');
+  if (!btn) return;
+
+  const orderId = Number(btn.dataset.orderId);
+  const index = Number(btn.dataset.index);
+  const kind = btn.dataset.kind;
+  const isArchived = btn.dataset.archived === '1';
+
+  if (!orderId || Number.isNaN(index)) return;
+
+  const collection = isArchived ? archivedOrders : kitchenOrders;
+  const orderObj = collection.find(o => o.id === orderId);
+  if (!orderObj) return;
+
+  const items = (kind === 'food') ? orderObj.foodItems : orderObj.drinkItems;
+  const item = items[index];
+  if (!item) return;
+
+  item.status = 'in-progress';
+if (supabase && item.clientKey) {
+  supabase
+    .from('order_items')
+    .update({ status: 'in-progress' })
+    .eq('client_key', item.clientKey);
+}
+
+  // If it was archived, move it back to active kitchenOrders
+  if (isArchived) {
+    archivedOrders = archivedOrders.filter(o => o.id !== orderId);
+    kitchenOrders.push(orderObj);
+  }
+
+// ✅ Sync retrieve to Supabase: clear completed_at
+if (supabase) {
+  supabase
+    .from('orders')
+    .update({ completed_at: null })
+    .eq('id', orderId);
+}
+
+  renderKitchenView();
+  renderBarView();
+  renderAllOrdersView();
+});
+
+// ----------------------
+// CSV EXPORT
+// ----------------------
+function formatDateForCsv(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}/${mm}/${dd}`;
+}
+
+function formatTimeForCsv(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function mapTypeLabel(serviceType) {
+  return serviceType === 'dine-in'  ? '堂食' :
+         serviceType === 'onsite'   ? '現場外賣' :
+         serviceType === 'tel'      ? '電話外賣' :
+         serviceType === 'deliveroo'? 'Deliveroo' :
+         serviceType === 'justeat'  ? 'Just Eat' :
+         serviceType || '';
+}
+
+function mapPaymentLabel(method) {
+  if (!method) return '';
+  method = String(method).toLowerCase();
+  if (method === 'cash') return 'Cash';
+  if (method === 'card') return 'Card';
+  if (method === 'deliveroo') return 'Deliveroo';
+  if (method === 'justeat') return 'Just Eat';
+  return method;
+}
+
+function exportCsv() {
+  if (!completedOrders.length) {
+    alert('No completed orders to export yet.');
+    return;
+  }
+
+  const header = [
+    'Order #',
+    'Type',
+    'Date (YY/MM/DD)',
+    'Time (HH:MM)',
+    'Complete time (HH:MM)',
+    'Payment method',
+    'Amount'
+  ];
+
+  const rows = [[
+   'Order #',
+   'Type',
+   'Date (YY/MM/DD)',
+   'Food item',
+   'Category',
+   'Time (HH:MM)',
+   'Complete time (HH:MM)',
+   'Payment method',
+   'Amount'
+ ]];
+
+completedOrders.forEach(o => {
+  const items = Array.isArray(o.items) ? o.items : [];
+
+  // If somehow an old record has no items, you can skip or output a blank line
+  if (!items.length) return;
+
+  items.forEach(it => {
+    rows.push([
+      o.orderNumber || '',
+      o.serviceType || '',
+      formatDateForCsv(o.paidAt || o.createdAt || ''),
+      it.name || '',
+      it.category || '',
+      formatTimeForCsv(o.createdAt || ''),
+      formatTimeForCsv(o.completedAt || ''),
+      o.paymentMethod || '',
+      (Number(it.amount || 0) || 0).toFixed(2)
+    ]);
+  });
+});
+
+  const csvContent = rows
+    .map(cols =>
+      cols
+        .map(val => `"${String(val).replace(/"/g, '""')}"`)
+        .join(',')
+    )
+    .join('\r\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'orders.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// Export button listener
+const exportBtn = document.getElementById('export-csv-btn');
+if (exportBtn) {
+  exportBtn.addEventListener('click', exportCsv);
+}
+
+// Admin refresh (daily sales)
+const adminRefreshBtn = document.getElementById('admin-refresh');
+const adminDateInput = document.getElementById('admin-date');
+
+if (adminRefreshBtn) {
+  adminRefreshBtn.addEventListener('click', renderAdminView);
+}
+
+if (adminDateInput) {
+  adminDateInput.addEventListener('change', renderAdminView);
+}
+
+function createUnpaidTicketFromCurrentOrder() {
+  if (!order.length) {
+    alert('No items in the order.');
+    return;
+  }
+  if (!canUnpaidOrder()) {
+    alert('Unpaid is only for Dine-in / Onsite / Tel orders.');
+    return;
+  }
+
+  // Unpaid should NOT apply cash discount
+  isCash = false;
+  updateOrder();
+
+  const orderNumberInput = document.getElementById('order-number');
+  const pickupInput = document.getElementById('pickup-time');
+
+  const rawTable = orderNumberInput ? orderNumberInput.value.trim() : '';
+  const orderNumber = rawTable || `#${nextOrderId++}`;
+
+  const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
+
+  let channel = pickupInput ? pickupInput.value.trim() : '';
+  if (channel.length >= 5) channel = channel.slice(0, 5);
+
+  const now = new Date();
+  const createdAt = now.toISOString();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  const orderId = now.getTime();
+
+  const foodCats = ['咖喱系列', '茶記粉面', '主食', '小食'];
+
+  const foodItems = order
+    .filter(item => foodCats.includes(item.cat))
+    .map(item => ({ ...item, status: 'in-progress', clientKey: item.clientKey || genClientKey() }));
+
+  const drinkItems = order
+    .filter(item => item.cat === '飲品')
+    .map(item => ({ ...item, status: 'in-progress', clientKey: item.clientKey || genClientKey() }));
+
+  const ticket = {
+    id: orderId,
+    orderNumber,
+    serviceType,
+    channel,
+    time: timeStr,
+    createdAt,
+
+    paymentStatus: 'pending',
+    paymentMethod: null,
+    paidAt: null,
+
+    amount: lastFinalTotal, // snapshot total for later payment/CSV
+    foodItems,
+    drinkItems
+  };
+
+  kitchenOrders.push(ticket);
+
+// ✅ save to Supabase (sync across devices + keep after refresh)
+  saveTicketToSupabase(ticket).catch(console.error);
+
+  // clear POS
+  order = [];
+  isCash = false;
+  payingOrderId = null;
+  updateOrder();
+
+  if (orderNumberInput) orderNumberInput.value = '';
+  if (pickupInput) pickupInput.value = '';
+
+  renderKitchenView();
+  renderBarView();
+  renderAllOrdersView();
+}
+
+function findTicketById(orderId) {
+  return kitchenOrders.find(o => o.id === orderId) || archivedOrders.find(o => o.id === orderId) || null;
+}
+
+function payExistingTicket(method, overrideTotal = null) {
+  const ticket = findTicketById(payingOrderId);
+  if (!ticket) {
+    payingOrderId = null;
+    return;
+  }
+
+  // mark paid on ticket itself (kitchen/archived)
+  ticket.paymentStatus = 'paid';
+  ticket.paymentMethod = method;
+  ticket.paidAt = new Date().toISOString();
+
+  const paidTotal = (typeof overrideTotal === 'number') ? overrideTotal : (ticket.amount ?? lastFinalTotal);
+
+completedOrders.push({
+  id: ticket.id,
+  orderNumber: ticket.orderNumber,
+  serviceType: ticket.serviceType,
+  channel: ticket.channel,
+  createdAt: ticket.createdAt,
+  completedAt: ticket.completedAt || null,
+  paidAt: ticket.paidAt,
+  paymentMethod: method,
+  total: paidTotal,
+
+  // ✅ NEW: store items for CSV + admin pivot
+  items: [
+    ...(ticket.foodItems || []),
+    ...(ticket.drinkItems || [])
+  ].map(it => ({
+    name: it.displayName || it.name || '',
+    category: it.cat || '',
+    amount: Number(it.final ?? it.price ?? 0) || 0
+  }))
+});
+
+  // clear POS
+  payingOrderId = null;
+  order = [];
+  isCash = false;
+  updateOrder();
+
+  if (payModal) payModal.style.display = 'none';
+
+  renderAllOrdersView();
+  renderKitchenView();
+  renderBarView();
+
+if (adminUnlocked) renderAdminView();
+}
+
+function renderCustomerView() {
+  const wrap = document.getElementById('customer-screen');
+  if (!wrap) return;
+
+  const orderNumberInput = document.getElementById('order-number');
+  const pickupInput = document.getElementById('pickup-time');
+  const subtotal = order.length ? lastSubtotal : 0;
+  const baseTotal = order.length ? lastBaseTotal : 0;     // after combo discount
+  const finalTotal = order.length ? lastFinalTotal : 0;   // after cash discount (if cash)
+
+  const comboAValue = order.length ? (lastComboACount * 0.5) : 0;
+  const comboBValue = order.length ? (lastComboBCount * 1.0) : 0;
+
+  const comboDiscountTotal = order.length ? lastMealDealDiscount : 0;
+  const cashDiscountValue = (order.length && isCash) ? lastCashDiscount : 0;
+
+  const serviceType = orderTypeSelect ? orderTypeSelect.value : '';
+  const tableOrNo   = orderNumberInput ? orderNumberInput.value.trim() : '';
+
+  let pickup = pickupInput ? pickupInput.value.trim() : '';
+  if (pickup.length >= 5) pickup = pickup.slice(0,5);
+
+  const typeLabel =
+    serviceType === 'dine-in'  ? '堂食' :
+    serviceType === 'onsite'   ? '現場外賣' :
+    serviceType === 'tel'      ? '電話外賣' :
+    serviceType === 'deliveroo'? 'Deliveroo' :
+    serviceType === 'justeat'  ? 'Just Eat' :
+    serviceType || '';
+
+  const meta = [];
+  if (typeLabel) meta.push(`Type: ${typeLabel}`);
+  if (tableOrNo) meta.push(`Table/Order: ${tableOrNo}`);
+  if (pickup) meta.push(`Pickup: ${pickup}`);
+
+  const itemsHtml = order.length
+    ? order.map(it => {
+        const mods = Array.isArray(it.mods) && it.mods.length
+          ? `<div class="customer-mods">${it.mods.map(m => escapeHtml(m)).join(', ')}</div>`
+          : '';
+        return `
+          <div class="customer-item">
+            <div>
+              <div><strong>${escapeHtml(it.displayName)}</strong></div>
+              ${mods}
+            </div>
+            <div>£${Number(it.final).toFixed(2)}</div>
+          </div>
+        `;
+      }).join('')
+    : `<div style="color:#777;">No items yet</div>`;
+
+  wrap.innerHTML = `
+    <div class="customer-title">請查看你的訂單 Here is your order</div>
+    <div class="customer-meta">
+      ${meta.map(x => `<span class="customer-pill">${escapeHtml(x)}</span>`).join('')}
+    </div>
+    <div class="customer-card">
+      ${itemsHtml}
+      <div class="customer-total">
+  <div>Base total</div>
+  <div>£${baseTotal.toFixed(2)}</div>
+</div>
+
+${comboAValue > 0 ? `
+<div class="customer-total" style="color:#d32f2f;">
+  <div>Combo A x${lastComboACount}</div>
+  <div>-£${comboAValue.toFixed(2)}</div>
+</div>` : ''}
+
+${comboBValue > 0 ? `
+<div class="customer-total" style="color:#d32f2f;">
+  <div>Combo B x${lastComboBCount}</div>
+  <div>-£${comboBValue.toFixed(2)}</div>
+</div>` : ''}
+
+${cashDiscountValue > 0 ? `
+<div class="customer-total" style="color:#d32f2f;">
+  <div>Cash 5%</div>
+  <div>-£${cashDiscountValue.toFixed(2)}</div>
+</div>` : ''}
+
+<hr style="margin:10px 0;">
+
+<div class="customer-total" style="font-size:26px;">
+  <div>Total</div>
+  <div>£${finalTotal.toFixed(2)}</div>
+</div>
+    </div>
+  `;
+}
+
+function renderWaitlist() {
+  const countEl = document.getElementById('wl-count');
+  const tbody = document.getElementById('waitlist-tbody');
+  const emptyEl = document.getElementById('wl-empty');
+
+  if (!tbody) return;
+
+  // Count
+  if (countEl) countEl.textContent = String(waitlist.length);
+
+  // Empty state
+  if (emptyEl) emptyEl.style.display = waitlist.length ? 'none' : 'block';
+
+  // Rows
+  tbody.innerHTML = '';
+
+  const now = Date.now();
+
+  waitlist.forEach((w, idx) => {
+    const mins = Math.max(0, Math.floor((now - w.time) / 60000));
+    const waitTimeText = mins < 1 ? '0 min' : `${mins} min`;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="wl-pos">${idx + 1}</td>
+      <td><strong>${escapeHtml(w.name)}</strong></td>
+      <td>${w.pax}</td>
+      <td>${waitTimeText}</td>
+      <td>
+        <div class="wl-actions">
+          <button type="button" class="wl-btn wl-btn-seat" data-seat="${idx}">入座</button>
+          <button type="button" class="wl-btn wl-btn-remove" data-remove="${idx}">移除</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function saveWaitlist() {
+  localStorage.setItem('lionrock_waitlist', JSON.stringify(waitlist));
+}
+
+function loadWaitlist() {
+  const raw = localStorage.getItem('lionrock_waitlist');
+  if (raw) {
+    try {
+      waitlist = JSON.parse(raw) || [];
+    } catch {
+      waitlist = [];
+    }
+  }
+}
+
+document.getElementById('add-wait-btn')?.addEventListener('click', () => {
+  const name = document.getElementById('wait-name')?.value.trim();
+  const paxVal = document.getElementById('wait-pax')?.value;
+  const pax = parseInt(paxVal, 10);
+
+  if (!name || !paxVal || Number.isNaN(pax)) {
+    alert('請輸入姓名及人數');
+    return;
+  }
+
+  waitlist.push({
+    name,
+    pax,
+    time: Date.now()
+  });
+
+  saveWaitlist();          // ✅ store
+  renderWaitlist();
+
+  document.getElementById('wait-name').value = '';
+  document.getElementById('wait-pax').value = '';
+});
+
+document.getElementById('waitlist-tbody')?.addEventListener('click', (e) => {
+  const seatBtn = e.target.closest('[data-seat]');
+  const removeBtn = e.target.closest('[data-remove]');
+
+  if (seatBtn) {
+    const idx = Number(seatBtn.dataset.seat);
+    if (!Number.isNaN(idx)) {
+      waitlist.splice(idx, 1);
+      saveWaitlist();
+      renderWaitlist();
+    }
+    return;
+  }
+
+  if (removeBtn) {
+    const idx = Number(removeBtn.dataset.remove);
+    if (!Number.isNaN(idx)) {
+      waitlist.splice(idx, 1);
+      saveWaitlist();
+      renderWaitlist();
+    }
+  }
+});
+
+async function loadFromSupabase() {
+  if (!supabase) return;
+
+  const ok = await ensureSupabaseLogin();
+  if (!ok) return;
+
+  const { data: orders, error: oErr } = await supabase
+    .from("orders")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (oErr) { console.error(oErr); alert("Load orders failed"); return; }
+
+  const { data: items, error: iErr } = await supabase
+    .from("order_items")
+    .select("*")
+    .order("id", { ascending: true });
+
+  if (iErr) { console.error(iErr); alert("Load order items failed"); return; }
+
+  // rebuild local active/archived structures
+  kitchenOrders = [];
+  archivedOrders = [];
+
+  const map = new Map();
+  (orders || []).forEach(o => {
+    map.set(o.id, {
+      id: o.id,
+      orderNumber: o.order_number,
+      serviceType: o.service_type,
+      channel: o.channel || "",
+      time: o.time_text || "",
+      createdAt: o.created_at,
+      completedAt: o.completed_at,
+
+      paymentStatus: o.payment_status,
+      paymentMethod: o.payment_method,
+      paidAt: o.paid_at,
+      amount: Number(o.amount || 0),
+
+      foodItems: [],
+      drinkItems: []
+    });
+  });
+
+  (items || []).forEach(it => {
+    const t = map.get(it.order_id);
+    if (!t) return;
+
+    const row = {
+      displayName: it.name,
+      cat: it.category || "",
+      final: Number(it.price || 0),
+      mods: Array.isArray(it.mods) ? it.mods : [],
+      status: it.status || "in-progress",
+      menuIndex: (typeof it.menu_index === "number") ? it.menu_index : null,
+      excludeFromComboB: !!it.exclude_from_combo_b,
+      isSetMeal: !!it.is_set_meal,
+      clientKey: it.client_key
+    };
+
+    (it.kind === "drink" ? t.drinkItems : t.foodItems).push(row);
+  });
+
+  map.forEach(t => {
+    if (t.completedAt) archivedOrders.push(t);
+    else kitchenOrders.push(t);
+  });
+
+  renderKitchenView();
+  renderBarView();
+  renderAllOrdersView();
+  renderCustomerView();
+  if (adminUnlocked) renderAdminView();
+
+  if (!realtimeStarted) {
+    subscribeRealtime();
+    realtimeStarted = true;
+  }
+}
+
+function subscribeRealtime() {
+  if (!supabase) return;
+
+  supabase
+    .channel("lionrock-pos")
+    .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, loadFromSupabase)
+    .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, loadFromSupabase)
+    .subscribe();
+}
+
+// Initial render
+loadWaitlist();
+renderMenu();
+updateOrder();
+renderKitchenView();
+renderBarView();
+renderAllOrdersView();
+renderCustomerView();
+renderWaitlist();
+applyTabAccessMode();
+// Supabase sync (cashier devices only)
+if (getMode() !== 'customer') {
+  loadFromSupabase();
+}
+
+// ===== Auto-update wait time every minute (Waitlist tab) =====
+setInterval(() => {
+  const wlView = document.getElementById('waitlist-view');
+  if (wlView && wlView.style.display !== 'none') {
+    renderWaitlist();
+  }
+}, 60000);
+</script>
+</body>
+</html>
