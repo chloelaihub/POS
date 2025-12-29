@@ -6,6 +6,14 @@
 <title>獅子山 Lion Rock POS</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<!-- Supabase: load client & expose `supabaseClient` for the POS script -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script>
+      // NOTE: This anon key is safe to use in the browser. Do not put your service role key here.
+      const supabaseUrl = 'https://thmsnrncktwoajgclywa.supabase.co';
+      const supabaseKey = 'sb_publishable_M1wpHSIK_pE55Y7-MBgSmQ_CRs0oj2C';
+      const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+    </script>
 </head>
 <body>
   <!-- Top tabs -->
@@ -1141,6 +1149,63 @@ payConfirm.addEventListener('click', () => {
 });
 
 // ----------------------
+// STEP 5: Supabase – save paid orders to `orders` table
+// ----------------------
+// This helper takes the `ticket` object we already build in finalizeOrder()
+// and sends a *copy* of it to the Supabase `orders` table.
+// It uses the global `supabaseClient` that you created in <head>.
+async function saveOrderToSupabase(ticket) {
+  // If Supabase isn't loaded for some reason, fail safely and keep POS working.
+  if (typeof supabaseClient === 'undefined') {
+    console.warn('Supabase client not found – skipping remote save.');
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from('orders')
+      .insert({
+        // We let Supabase generate its own `id` (uuid PK), so we do NOT send ticket.id here.
+
+        // These column names must match the columns you created in Supabase:
+        // order_number (text), service_type (text), channel (text),
+        // created_at (timestamptz), payment_status (text),
+        // payment_method (text), paid_at (timestamptz),
+        // amount (numeric), items (jsonb).
+        order_number: ticket.orderNumber,
+        service_type: ticket.serviceType,
+        channel: ticket.channel,
+        created_at: ticket.createdAt,
+
+        payment_status: ticket.paymentStatus, // e.g. 'paid'
+        payment_method: ticket.paymentMethod, // 'cash' | 'card' | 'deliveroo' | 'justeat'
+        paid_at: ticket.paidAt,
+
+        amount: ticket.amount,
+
+        // Combine food + drink items into one JSON array for the `items` jsonb column.
+        items: [
+          ...(ticket.foodItems || []),
+          ...(ticket.drinkItems || [])
+        ].map(it => ({
+          // Keep only the bits we care about later (for reports).
+          name: it.displayName || it.name || '',
+          category: it.cat || '',                  // 咖喱系列 / 飲品 / 主食 / ...
+          amount: Number(it.final ?? it.price ?? 0) || 0
+        }))
+      });
+
+    if (error) {
+      // Log the error, but do NOT block the POS – order still exists locally.
+      console.error('Supabase insert error:', error.message);
+    }
+  } catch (err) {
+    // Catch any network / unexpected error so the app never crashes.
+    console.error('Unexpected Supabase error:', err);
+  }
+}
+
+// ----------------------
 // Shared finalise logic (cash + card)
 // ----------------------
 function finalizeOrder(paymentMethod, overrideTotal = null) {
@@ -1208,6 +1273,10 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
 
   kitchenOrders.push(ticket);
 
+  // STEP 5: also save this paid order to Supabase in the background.
+  // We don't `await` here so the POS stays responsive even if the network is slow.
+  saveOrderToSupabase(ticket);
+
 // Record to CSV source (paid orders only) — now includes item lines
 completedOrders.push({
   id: orderId,
@@ -1219,14 +1288,12 @@ completedOrders.push({
   paidAt: createdAt,
   paymentMethod,
   total: paidTotal,
-
-  // ✅ NEW: store items for CSV + admin pivot
   items: [
     ...(foodItems || []),
     ...(drinkItems || [])
   ].map(it => ({
     name: it.displayName || it.name || '',
-    category: it.cat || '',          // e.g. 咖喱系列 / 飲品 / 主食...
+    category: it.cat || '',
     amount: Number(it.final ?? it.price ?? 0) || 0
   }))
 });
@@ -2349,18 +2416,125 @@ function renderWaitlist() {
   });
 }
 
-function saveWaitlist() {
-  localStorage.setItem('lionrock_waitlist', JSON.stringify(waitlist));
+// ----------------------
+// STEP 6: Waitlist → Supabase
+// ----------------------
+// NOTE:
+// - We now store the waitlist in the Supabase `waitlist` table instead of localStorage.
+// - Table structure expected:
+//   id (bigint, PK, identity)
+//   name (text)
+//   pax (integer)
+//   created_at (timestamptz, default now())
+
+// Save the current `waitlist` array to Supabase.
+// Simple approach: clear the table then re-insert all rows.
+// Called after we add / seat / remove entries.
+async function saveWaitlist() {
+  // If Supabase is not available for some reason, fail silently
+  // so the POS doesn't break mid-service.
+  if (typeof supabaseClient === 'undefined') {
+    console.warn('Supabase client not found – skipping waitlist save.');
+    return;
+  }
+
+  try {
+    // 1) Clear existing rows.
+    // `neq('id', 0)` = delete all rows where id != 0 (i.e. everything).
+    const { error: deleteError } = await supabaseClient
+      .from('waitlist')
+      .delete()
+      .neq('id', 0);
+
+    if (deleteError) {
+      console.error('Failed to clear waitlist in Supabase:', deleteError.message);
+      return; // stop here – don’t insert if delete failed
+    }
+
+    // 2) If waitlist is empty now, we’re done.
+    if (!waitlist.length) {
+      return;
+    }
+
+    // 3) Insert all current entries.
+    const rows = waitlist.map(w => ({
+      name: w.name,
+      pax: w.pax,
+      // store the "time" as created_at so we can reconstruct wait minutes later
+      created_at: new Date(w.time).toISOString()
+    }));
+
+    const { error: insertError } = await supabaseClient
+      .from('waitlist')
+      .insert(rows);
+
+    if (insertError) {
+      console.error('Failed to save waitlist to Supabase:', insertError.message);
+    }
+  } catch (err) {
+    console.error('Unexpected Supabase error (waitlist save):', err);
+  }
 }
 
-function loadWaitlist() {
-  const raw = localStorage.getItem('lionrock_waitlist');
-  if (raw) {
-    try {
-      waitlist = JSON.parse(raw) || [];
-    } catch {
+// Load the waitlist from Supabase into the `waitlist` array.
+// Called once on startup.
+async function loadWaitlist() {
+  if (typeof supabaseClient === 'undefined') {
+    console.warn('Supabase client not found – loading empty waitlist.');
+    waitlist = [];
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('waitlist')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load waitlist from Supabase:', error.message);
       waitlist = [];
+      return;
     }
+
+    // Convert DB rows into the shape used by the UI:
+    // { name, pax, time: timestamp(ms) }
+    waitlist = (data || []).map(row => ({
+      name: row.name,
+      pax: row.pax,
+      time: row.created_at ? new Date(row.created_at).getTime() : Date.now()
+    }));
+  } catch (err) {
+    console.error('Unexpected Supabase error (waitlist load):', err);
+    waitlist = [];
+  }
+}
+
+// ----------------------
+// Waitlist history logging (optional, for analytics)
+// ----------------------
+// This logs every waitlist action into the `waitlist_history` table
+// without changing how the on-screen waitlist behaves.
+async function logWaitlistEvent(entry, action) {
+  if (typeof supabaseClient === 'undefined') return;
+
+  try {
+    const { error } = await supabaseClient
+      .from('waitlist_history')
+      .insert({
+        name: entry.name,
+        pax: entry.pax,
+        // when they were first added to the waitlist
+        created_at: entry.time ? new Date(entry.time).toISOString() : null,
+        action,                               // 'added' | 'seated' | 'removed'
+        action_at: new Date().toISOString()  // when this specific action happened
+      });
+
+    if (error) {
+      console.error('Failed to log waitlist event:', error.message);
+    }
+  } catch (err) {
+    console.error('Unexpected error logging waitlist event:', err);
   }
 }
 
@@ -2374,14 +2548,19 @@ document.getElementById('add-wait-btn')?.addEventListener('click', () => {
     return;
   }
 
-  waitlist.push({
+  const entry = {
     name,
     pax,
     time: Date.now()
-  });
+  };
 
-  saveWaitlist();          // ✅ store
+  waitlist.push(entry);
+
+  saveWaitlist();
   renderWaitlist();
+
+  // 🔹 log that this person was added to the waitlist
+  logWaitlistEvent(entry, 'added');
 
   document.getElementById('wait-name').value = '';
   document.getElementById('wait-pax').value = '';
@@ -2394,9 +2573,14 @@ document.getElementById('waitlist-tbody')?.addEventListener('click', (e) => {
   if (seatBtn) {
     const idx = Number(seatBtn.dataset.seat);
     if (!Number.isNaN(idx)) {
-      waitlist.splice(idx, 1);
+      const [entry] = waitlist.splice(idx, 1);  // remove and keep the entry
       saveWaitlist();
       renderWaitlist();
+
+      // 🔹 log that this person was seated
+      if (entry) {
+        logWaitlistEvent(entry, 'seated');
+      }
     }
     return;
   }
@@ -2404,23 +2588,34 @@ document.getElementById('waitlist-tbody')?.addEventListener('click', (e) => {
   if (removeBtn) {
     const idx = Number(removeBtn.dataset.remove);
     if (!Number.isNaN(idx)) {
-      waitlist.splice(idx, 1);
+      const [entry] = waitlist.splice(idx, 1);  // remove and keep the entry
       saveWaitlist();
       renderWaitlist();
+
+      // 🔹 log that this person was removed (no-show / cancelled)
+      if (entry) {
+        logWaitlistEvent(entry, 'removed');
+      }
     }
   }
 });
 
 // Initial render
-loadWaitlist();
-renderMenu();
-updateOrder();
-renderKitchenView();
-renderBarView();
-renderAllOrdersView();
-renderCustomerView();
-renderWaitlist();
-applyTabAccessMode();
+// We wrap startup in an async IIFE so we can `await loadWaitlist()`
+// before drawing the waitlist on screen.
+(async function init() {
+  // Load waitlist from Supabase first so the UI shows real data.
+  await loadWaitlist();
+
+  renderMenu();
+  updateOrder();
+  renderKitchenView();
+  renderBarView();
+  renderAllOrdersView();
+  renderCustomerView();
+  renderWaitlist();
+  applyTabAccessMode();
+})();
 
 // ===== Auto-update wait time every minute (Waitlist tab) =====
 setInterval(() => {
