@@ -1199,15 +1199,13 @@ async function saveOrderToSupabase(ticket) {
         // created_at (timestamptz), payment_status (text),
         // payment_method (text), paid_at (timestamptz),
         // amount (numeric), items (jsonb).
-        order_number: ticket.orderNumber,
+        // ✅ do NOT send order_number; leave it out so the trigger can fill it
         service_type: ticket.serviceType,
         channel: ticket.channel,
         created_at: ticket.createdAt,
-
         payment_status: ticket.paymentStatus, // e.g. 'paid'
         payment_method: ticket.paymentMethod, // 'cash' | 'card' | 'deliveroo' | 'justeat'
         paid_at: ticket.paidAt,
-
         amount: ticket.amount,
 
         // Combine food + drink items into one JSON array for the `items` jsonb column.
@@ -2488,10 +2486,9 @@ async function loadTodayOrdersFromSupabase() {
       const paidAt    = row.paid_at   || createdAt;
       const amount    = Number(row.amount || 0) || 0;
 
-      // We didn't send our local ticket.id to Supabase, so we use:
-      // - the Supabase row id, or
-      // - fall back to the timestamp.
-      const orderId   = row.id || Date.parse(createdAt) || Date.now();
+      // Use the created_at timestamp as the numeric ticket id,
+      // so it matches the id we originally used when we created the ticket.
+      const orderId = Date.parse(createdAt) || Date.now();
 
       const rawItems = Array.isArray(row.items) ? row.items : [];
 
