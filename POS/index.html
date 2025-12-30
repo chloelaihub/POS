@@ -408,6 +408,33 @@ let payingOrderId = null;   // when paying an existing Unpaid ticket
 let adminUnlocked = false;
 let waitlist = [];
 let editingTicketItem = null;
+
+// ----------------------
+// Date helpers: "today" range in ISO for Supabase
+// ----------------------
+// We use the device's local timezone to define the restaurant day,
+// then convert to ISO so Supabase can filter by created_at.
+function getTodayRangeISO() {
+  const now = new Date();
+
+  // Local midnight today (00:00 on this device)
+  const startLocal = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    0, 0, 0, 0
+  );
+
+  // Local midnight tomorrow
+  const endLocal = new Date(startLocal.getTime() + 24 * 60 * 60 * 1000);
+
+  // Convert to ISO (UTC) — Supabase stores timestamptz in UTC
+  return {
+    start: startLocal.toISOString(),
+    end: endLocal.toISOString()
+  };
+}
+
 // shape: { ticketId: string, lane: 'food'|'drink', index: number }
 const ADMIN_PASSWORD = '1234'; // change this
 
@@ -2417,6 +2444,141 @@ function renderWaitlist() {
 }
 
 // ----------------------
+// STEP 7: Load today's orders from Supabase
+// ----------------------
+// This pulls orders for *today* from the `orders` table and rebuilds:
+// - kitchenOrders (all tickets with items still "in-progress")
+// - completedOrders (for Admin/CSV summaries)
+// - archivedOrders (we leave empty for now; it will be filled locally
+//   when the device marks an order fully completed).
+async function loadTodayOrdersFromSupabase() {
+  if (typeof supabaseClient === 'undefined') {
+    console.warn('Supabase client not found – loading with empty orders.');
+    kitchenOrders = [];
+    completedOrders = [];
+    archivedOrders = [];
+    return;
+  }
+
+  const { start, end } = getTodayRangeISO();
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('orders')
+      .select('*')
+      .gte('created_at', start)
+      .lt('created_at', end)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load today\'s orders from Supabase:', error.message);
+      kitchenOrders = [];
+      completedOrders = [];
+      archivedOrders = [];
+      return;
+    }
+
+    // Reset local state for today
+    kitchenOrders = [];
+    completedOrders = [];
+    archivedOrders = [];
+
+    (data || []).forEach(row => {
+      const createdAt = row.created_at || new Date().toISOString();
+      const paidAt    = row.paid_at   || createdAt;
+      const amount    = Number(row.amount || 0) || 0;
+
+      // We didn't send our local ticket.id to Supabase, so we use:
+      // - the Supabase row id, or
+      // - fall back to the timestamp.
+      const orderId   = row.id || Date.parse(createdAt) || Date.now();
+
+      const rawItems = Array.isArray(row.items) ? row.items : [];
+
+      // Rebuild food & drink arrays based on the saved item.category.
+      const foodItems = [];
+      const drinkItems = [];
+
+      rawItems.forEach(it => {
+        const cat = it.category || '';
+        const base = {
+          displayName: it.name || '',
+          name: it.name || '',
+          cat,
+          final: Number(it.amount || 0) || 0,
+          mods: [],
+          isSetMeal: false,
+          status: 'in-progress' // we don't store kitchen "done" state yet
+        };
+
+        if (cat === '飲品' || cat.includes('飲品')) {
+          drinkItems.push(base);
+        } else {
+          foodItems.push(base);
+        }
+      });
+
+      const ticket = {
+        id: orderId,
+        orderNumber: row.order_number || '',
+        serviceType: row.service_type || 'dine-in',
+        channel: row.channel || '',
+        time: createdAt
+          ? new Date(createdAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            })
+          : '',
+        createdAt,
+        paymentStatus: 'paid',
+        paymentMethod: row.payment_method || null,
+        paidAt,
+        amount,
+        foodItems,
+        drinkItems
+      };
+
+      // For boards:
+      // - Kitchen & Bar should see all today's tickets that have items.
+      const hasAnyItems = foodItems.length > 0 || drinkItems.length > 0;
+      if (hasAnyItems) {
+        kitchenOrders.push(ticket);
+      }
+
+      // For Admin & CSV export: we keep the summary in completedOrders.
+      completedOrders.push({
+        id: ticket.id,
+        orderNumber: ticket.orderNumber,
+        serviceType: ticket.serviceType,
+        channel: ticket.channel,
+        createdAt: ticket.createdAt,
+        completedAt: null,             // we don't sync item completion yet
+        paidAt: ticket.paidAt,
+        paymentMethod: ticket.paymentMethod,
+        total: ticket.amount,
+        items: rawItems.map(it => ({
+          name: it.name || '',
+          category: it.category || '',
+          amount: Number(it.amount || 0) || 0
+        }))
+      });
+
+      // NOTE:
+      // archivedOrders is intentionally left empty here.
+      // It will be populated when this specific device marks all items
+      // "done" in the kitchen/bar. Full cross-device sync of completion
+      // state would require storing per-item status in Supabase.
+    });
+  } catch (err) {
+    console.error('Unexpected error loading orders from Supabase:', err);
+    kitchenOrders = [];
+    completedOrders = [];
+    archivedOrders = [];
+  }
+}
+
+// ----------------------
 // STEP 6: Waitlist → Supabase
 // ----------------------
 // NOTE:
@@ -2601,12 +2763,15 @@ document.getElementById('waitlist-tbody')?.addEventListener('click', (e) => {
 });
 
 // Initial render
-// We wrap startup in an async IIFE so we can `await loadWaitlist()`
-// before drawing the waitlist on screen.
+// We wrap startup in an async IIFE so we can await data (waitlist + today's
+// orders from Supabase) before drawing the UI on ANY device.
 (async function init() {
-  // Load waitlist from Supabase first so the UI shows real data.
+  // 1) Load waitlist from Supabase so the Waitlist tab is correct.
   await loadWaitlist();
+  // 2) load TODAY'S orders from Supabase
+  await loadTodayOrdersFromSupabase();
 
+  // 3) THEN render UI
   renderMenu();
   updateOrder();
   renderKitchenView();
