@@ -1230,6 +1230,35 @@ async function saveOrderToSupabase(ticket) {
   }
 }
 
+// 🔄 Save updated item statuses back into Supabase
+async function saveTicketItemsToSupabase(orderObj) {
+  try {
+    if (!orderObj || !orderObj.supabaseId) return; // no DB row? stop
+
+    // Build a flat array for Supabase (food + drink together)
+    const allItems = [
+      ...(orderObj.foodItems || []),
+      ...(orderObj.drinkItems || [])
+    ].map(it => ({
+      name: it.displayName || it.name || '',
+      category: it.cat || '',
+      amount: Number(it.final ?? it.price ?? 0) || 0,
+      status: it.status || 'in-progress'
+    }));
+
+    const { error } = await supabaseClient
+      .from('orders')
+      .update({ items: allItems })
+      .eq('id', orderObj.supabaseId);
+
+    if (error) {
+      console.error('❌ Failed to sync item statuses to Supabase:', error.message);
+    }
+  } catch (err) {
+    console.error('❌ Unexpected Supabase error:', err);
+  }
+}
+
 // ----------------------
 // Shared finalise logic (cash + card)
 // ----------------------
@@ -1397,6 +1426,14 @@ function switchToView(viewId) {
   } else {
     // auto-lock admin when leaving Admin
     adminUnlocked = false;
+
+    // 💾 Remember this view as the active tab on THIS device
+  localStorage.setItem('lionrock_pos_active_tab', viewId);
+
+  // ... your existing code that:
+  // - hides all views
+  // - shows the target view
+  // - updates active tab button styles, etc.
   }
 
   // Tab active state
@@ -1901,7 +1938,7 @@ wrap.innerHTML = `
 // ----------------------
 // Kitchen/bar Complete button handler
 // ----------------------
-function handleTicketClick(e) {
+async function handleTicketClick(e) {
   const btn = e.target.closest('.ticket-status-btn');
   if (!btn) return;
 
@@ -1920,6 +1957,12 @@ function handleTicketClick(e) {
 
   // Toggle status
   item.status = (item.status === 'complete') ? 'in-progress' : 'complete';
+
+  // 2️⃣ Maybe move/remove ticket if everything done
+  // (your existing logic here)
+
+  // 3️⃣ 🔄 Sync to Supabase
+  await saveTicketItemsToSupabase(orderObj);
 
   const allFoodDone  = !orderObj.foodItems.length || orderObj.foodItems.every(i => i.status === 'complete');
   const allDrinkDone = !orderObj.drinkItems.length || orderObj.drinkItems.every(i => i.status === 'complete');
@@ -2498,6 +2541,8 @@ async function loadTodayOrdersFromSupabase() {
 
       rawItems.forEach(it => {
         const cat = it.category || '';
+        const status = it.status || 'in-progress';  // ⭐ read from DB
+
         const base = {
           displayName: it.name || '',
           name: it.name || '',
@@ -2505,7 +2550,7 @@ async function loadTodayOrdersFromSupabase() {
           final: Number(it.amount || 0) || 0,
           mods: [],
           isSetMeal: false,
-          status: 'in-progress' // we don't store kitchen "done" state yet
+          status
         };
 
         if (cat === '飲品' || cat.includes('飲品')) {
@@ -2517,6 +2562,7 @@ async function loadTodayOrdersFromSupabase() {
 
       const ticket = {
         id: orderId,
+        supabaseId: row.id,   // ⭐ THIS LINE
         orderNumber: row.order_number || '',
         serviceType: row.service_type || 'dine-in',
         channel: row.channel || '',
@@ -2777,6 +2823,20 @@ document.getElementById('waitlist-tbody')?.addEventListener('click', (e) => {
   renderCustomerView();
   renderWaitlist();
   applyTabAccessMode();
+
+  // RESTORE THE LAST ACTIVE TAB HERE
+  const savedTab = localStorage.getItem('lionrock_pos_active_tab') || 'pos';
+  switchToView(savedTab);
+
+  // 🔁 POLLING: refresh boards every 5 seconds
+  setInterval(async () => {
+    await loadTodayOrdersFromSupabase();
+    renderKitchenView();
+    renderBarView();
+    renderAllOrdersView();
+    renderCustomerView();
+    if (adminUnlocked) renderAdminView();
+  }, 5000); // 5000ms = 5 seconds
 })();
 
 // ===== Auto-update wait time every minute (Waitlist tab) =====
