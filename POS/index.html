@@ -2582,11 +2582,21 @@ async function loadTodayOrdersFromSupabase() {
         drinkItems
       };
 
+      // Work out if everything on this ticket is already complete
+      const allFoodDone  = !foodItems.length || foodItems.every(i => i.status === 'complete');
+      const allDrinkDone = !drinkItems.length || drinkItems.every(i => i.status === 'complete');
+      const isFullyDone  = allFoodDone && allDrinkDone;
+
       // For boards:
-      // - Kitchen & Bar should see all today's tickets that have items.
+      // - Kitchen & Bar should only see tickets that still have something to cook/pour
       const hasAnyItems = foodItems.length > 0 || drinkItems.length > 0;
-      if (hasAnyItems) {
+
+      if (hasAnyItems && !isFullyDone) {
+        // still have at least one item NOT complete → show on Kitchen/Bar boards
         kitchenOrders.push(ticket);
+      } else if (hasAnyItems && isFullyDone) {
+        // everything is done → treat as archived on this device
+        archivedOrders.push(ticket);
       }
 
       // For Admin & CSV export: we keep the summary in completedOrders.
