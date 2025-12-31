@@ -1308,9 +1308,16 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
 
   const paidTotal = (typeof overrideTotal === 'number') ? overrideTotal : lastFinalTotal;
 
+  // ⭐ table number = what you typed in the POS
+  const tableNumber = orderNumber;
+
   const ticket = {
     id: orderId,
+
+  // ⭐ keep orderNumber but ALSO store tableNumber
     orderNumber,
+    tableNumber,
+
     serviceType,
     channel,
     time: timeStr,
@@ -1523,21 +1530,26 @@ const ticketClass =
     html += `
       <div class="${ticketClass}">
         <div class="ticket-header">
-          <span><strong>${orderObj.orderNumber}</strong></span>
-          <span class="badge">${
-            orderObj.serviceType === 'dine-in'  ? '堂食' :
-            orderObj.serviceType === 'onsite'   ? '現場外賣'  :
-            orderObj.serviceType === 'tel'      ? '電話外賣' :
-            orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
-            orderObj.serviceType === 'justeat'  ? 'Just Eat' :
-            orderObj.serviceType || ''
-          }</span>
-          ${
-            orderObj.channel
-              ? `<span class="badge">Pickup ${orderObj.channel}</span>`
-              : ''
-          }
-          <span>${orderObj.time}</span>
+
+          <!-- ⭐ BIG table number -->
+          <div class="ticket-table">
+            TABLE ${orderObj.tableNumber || '-'}
+          </div>
+
+          <!-- ⭐ small meta block (order#, time, type) -->
+          <div class="ticket-meta">
+            <div class="order-number">${orderObj.orderNumber || ''}</div>
+            <div class="badge">${
+              orderObj.serviceType === 'dine-in'  ? '堂食' :
+              orderObj.serviceType === 'onsite'   ? '現場外賣'  :
+              orderObj.serviceType === 'tel'      ? '電話外賣' :
+              orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
+              orderObj.serviceType === 'justeat'  ? 'Just Eat' :
+              orderObj.serviceType || ''
+            }</div>
+            <div class="ticket-time">${orderObj.time}</div>
+          </div>
+
         </div>
         <div class="ticket-body">
           ${
@@ -1575,21 +1587,26 @@ const ticketClass =
     html += `
       <div class="${ticketClass}">
         <div class="ticket-header">
-          <span><strong>${orderObj.orderNumber}</strong></span>
-          <span class="badge">${
-            orderObj.serviceType === 'dine-in'  ? '堂食' :
-            orderObj.serviceType === 'onsite'   ? '現場外賣'  :
-            orderObj.serviceType === 'tel'      ? '電話外賣' :
-            orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
-            orderObj.serviceType === 'justeat'  ? 'Just Eat' :
-            orderObj.serviceType || ''
-          }</span>
-          ${
-            orderObj.channel
-              ? `<span class="badge">Pickup ${orderObj.channel}</span>`
-              : ''
-          }
-          <span>${orderObj.time}</span>
+
+          <!-- ⭐ BIG table number -->
+          <div class="ticket-table">
+            TABLE ${orderObj.tableNumber || '-'}
+          </div>
+
+          <!-- ⭐ small meta block (order#, time, type) -->
+          <div class="ticket-meta">
+            <div class="order-number">${orderObj.orderNumber || ''}</div>
+            <div class="badge">${
+              orderObj.serviceType === 'dine-in'  ? '堂食' :
+              orderObj.serviceType === 'onsite'   ? '現場外賣'  :
+              orderObj.serviceType === 'tel'      ? '電話外賣' :
+              orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
+              orderObj.serviceType === 'justeat'  ? 'Just Eat' :
+              orderObj.serviceType || ''
+            }</div>
+            <div class="ticket-time">${orderObj.time}</div>
+          </div>
+
         </div>
         <div class="ticket-body">
           ${
@@ -1714,15 +1731,27 @@ function getTicketClass(orderObj) {
     return `
       <div class="${getTicketClass(orderObj)}">
         <div class="ticket-header">
-          <span><strong>${orderObj.orderNumber}</strong></span>
-          <span class="badge">${statusLabel}</span>
-          <span class="badge">${renderStatusBadgeType(orderObj)}</span>
 
-          ${paymentBadge}
-          ${payBtnHtml}
+          <!-- ⭐ BIG table number -->
+          <div class="ticket-table">
+            TABLE ${orderObj.tableNumber || '-'}
+          </div>
 
-          ${orderObj.channel ? `<span class="badge">Pickup ${orderObj.channel}</span>` : ''}
-          <span>${orderObj.time}</span>
+          <!-- ⭐ right-side meta (order#, status, type, payment, time) -->
+          <div class="ticket-meta">
+            <div class="order-number">${orderObj.orderNumber || ''}</div>
+            <div>
+              <span class="badge">${statusLabel}</span>
+              <span class="badge">${renderStatusBadgeType(orderObj)}</span>
+              ${orderObj.channel ? `<span class="badge">Pickup ${orderObj.channel}</span>` : ''}
+            </div>
+            <div>
+              ${paymentBadge}
+              ${payBtnHtml}
+            </div>
+            <div class="ticket-time">${orderObj.time || ''}</div>
+          </div>
+
         </div>
 
         <div class="ticket-body">
