@@ -36,18 +36,31 @@
         <!-- Order meta (order #, service, channel) -->
         <div class="order-meta">
          <!-- Table number (we keep the same id so JS still works) -->
-        <div class="order-meta-row">
-         <label for="order-number">Table #</label>
-         <input id="order-number" type="text" />
-     </div>
+          <div class="order-meta-row">
+           <label>Table #</label>
+          <div class="table-selector">
+            <div class="table-buttons">
+              <button type="button" class="table-btn" data-table="1">1</button>
+              <button type="button" class="table-btn" data-table="2">2</button>
+              <button type="button" class="table-btn" data-table="3">3</button>
+              <button type="button" class="table-btn" data-table="4">4</button>
+              <button type="button" class="table-btn" data-table="5">5</button>
+              <button type="button" class="table-btn" data-table="6">6</button>
+              <button type="button" class="table-btn" data-table="7">7</button>
+              <button type="button" class="table-btn" data-table="8">8</button>
+            </div>
 
-     <!-- Combined order type: dine-in / tel / f2f / Deliveroo / JustEat -->
+            <!-- Hidden field so existing JS that reads #order-number still works -->
+            <input id="order-number" type="hidden" />
+          </div>
+        </div>
+
      <div class="order-meta-row">
         <label for="order-type">Type</label>
         <select id="order-type">
          <option value="dine-in">堂食</option>
-        <option value="onsite">現場外賣</option>
-        <option value="tel">電話外賣</option>
+        <option value="takeaway">現場外賣</option>
+        <option value="phone">電話外賣</option>
         <option value="deliveroo">Deliveroo</option>
         <option value="justeat">Just Eat</option>
       </select>
@@ -498,6 +511,33 @@ const DIRECT_ADD_DRINKS = [
   "套餐 -£0.5",
 ];
 
+// ----------------------
+// Table selector buttons (1–8)
+// ----------------------
+function initTableButtons() {
+  const tableButtons = document.querySelectorAll('.table-btn');
+  const tableInput   = document.getElementById('order-number');
+
+  if (!tableButtons.length || !tableInput) return;
+
+  tableButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const value = btn.dataset.table || '';
+
+      // Clear previous "active" styles
+      tableButtons.forEach(b => b.classList.remove('active'));
+
+      if (tableInput.value === value) {
+        // Clicking the same button again unselects it
+        tableInput.value = '';
+      } else {
+        tableInput.value = value;
+        btn.classList.add('active');
+      }
+    });
+  });
+}
+
 function renderMenu() {
   const catOrder = ["咖喱系列","茶記粉面","主食","飲品","小食"];
   const menuContent = document.getElementById('menu-content');
@@ -600,6 +640,75 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// Turn table buttons on/off
+function setTableButtonsEnabled(enabled) {
+  const tableButtons = document.querySelectorAll('.table-btn');
+  const tableInput   = document.getElementById('order-number');
+
+  if (!tableButtons.length || !tableInput) return;
+
+  tableButtons.forEach(btn => {
+    btn.disabled = !enabled;
+    btn.classList.toggle('disabled', !enabled);
+  });
+
+  // If disabling, also clear the value
+  if (!enabled) {
+    tableInput.value = '';
+    tableButtons.forEach(b => b.classList.remove('active'));
+  }
+}
+
+// Clear current table selection (no highlight, no value)
+function resetTableSelection() {
+  const tableButtons = document.querySelectorAll('.table-btn');
+  const tableInput   = document.getElementById('order-number');
+
+  if (tableInput) tableInput.value = '';
+  tableButtons.forEach(b => b.classList.remove('active'));
+}
+
+function initTableButtons() {
+  const tableButtons = document.querySelectorAll('.table-btn');
+  const tableInput   = document.getElementById('order-number');
+
+  if (!tableButtons.length || !tableInput) return;
+
+  // click behaviour
+  tableButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return; // ignore clicks when disabled
+
+      const value = btn.dataset.table || '';
+
+      // Clear previous highlight
+      tableButtons.forEach(b => b.classList.remove('active'));
+
+      if (tableInput.value === value) {
+        // Clicking same button again → unselect
+        tableInput.value = '';
+      } else {
+        tableInput.value = value;
+        btn.classList.add('active');
+      }
+    });
+  });
+
+  // ⭐ tie enable/disable to service type (堂食 vs others)
+  if (typeof orderTypeSelect !== 'undefined' && orderTypeSelect) {
+    const applyMode = () => {
+      if (orderTypeSelect.value === 'dine-in') {
+        setTableButtonsEnabled(true);
+      } else {
+        setTableButtonsEnabled(false); // greys out + clears value
+      }
+    };
+
+    orderTypeSelect.addEventListener('change', applyMode);
+    applyMode(); // run once on load
+  }
 }
 
 function updateOrder() {
@@ -1047,7 +1156,7 @@ const unpaidBtn = document.getElementById('unpaid-btn');
 
 function canUnpaidOrder() {
   const v = orderTypeSelect ? orderTypeSelect.value : '';
-  return v === 'dine-in' || v === 'onsite' || v === 'tel';
+  return v === 'dine-in' || v === 'takeaway' || v === 'phone';
 }
 
 function syncUnpaidBtnState() {
@@ -1079,6 +1188,16 @@ payBtn.addEventListener('click', () => {
   if (!order.length) {
     alert('No items in the order.');
     return;
+  }
+
+  // ⭐ NEW: enforce table number for dine-in BEFORE opening cash popup
+  const tableInput  = document.getElementById('order-number');
+  const rawTable    = tableInput ? tableInput.value.trim() : '';
+  const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
+
+  if (serviceType === 'dine-in' && !rawTable) {
+    alert('請選擇枱號.');
+    return; // ⛔ stop here, don't open popup
   }
 
   // ✅ Auto apply cash discount + show “Cash 5%” line in summary
@@ -1208,6 +1327,9 @@ async function saveOrderToSupabase(ticket) {
         paid_at: ticket.paidAt,
         amount: ticket.amount,
 
+        // ⭐ store table number in Supabase
+        table_number:  ticket.tableNumber || null,
+
         // Combine food + drink items into one JSON array for the `items` jsonb column.
         items: [
           ...(ticket.foodItems || []),
@@ -1275,26 +1397,49 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
   }
 
   // Card/platform should not apply cash discount
-  if (paymentMethod === 'card' || paymentMethod === 'deliveroo' || paymentMethod === 'justeat') {
+  if (
+    paymentMethod === 'card' ||
+    paymentMethod === 'deliveroo' ||
+    paymentMethod === 'justeat'
+  ) {
     isCash = false;
     updateOrder();
   }
 
   const orderNumberInput = document.getElementById('order-number');
-  const pickupInput = document.getElementById('pickup-time');
+  const pickupInput      = document.getElementById('pickup-time');
 
+  // TABLE number 1-8 from POS
   const rawTable = orderNumberInput ? orderNumberInput.value.trim() : '';
-  const orderNumber = rawTable || `#${nextOrderId++}`;
 
+  // Order type(堂食 / 現場外賣 / 電話外賣 / Deliveroo / JustEat...)
   const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
 
+  // ⛔ Require table for dine-in orders
+  if (serviceType === 'dine-in' && !rawTable) {
+    alert('請選擇枱號.');
+    return;
+  }
+
+  // 🟢 TABLE number = what staff chose (may be empty for takeaway/delivery)
+  const tableNumber = rawTable || '';
+
+  // 🟡 Local running label for this ticket (small, internal)
+  //     Supabase will later give you the real YYYYMMDD-SEQ in row.order_number
+  const orderNumber = `#${nextOrderId++}`;
+
+  // Channel (for pickup time / short code)
   let channel = pickupInput ? pickupInput.value.trim() : '';
   if (channel.length >= 5) channel = channel.slice(0, 5);
 
-  const now = new Date();
+  const now       = new Date();
   const createdAt = now.toISOString();
-  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-  const orderId = now.getTime();
+  const timeStr   = now.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const orderId   = now.getTime();
 
   const foodCats = ['咖喱系列', '茶記粉面', '主食', '小食'];
 
@@ -1306,16 +1451,16 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
     .filter(item => item.cat === '飲品')
     .map(item => ({ ...item, status: 'in-progress' }));
 
-  const paidTotal = (typeof overrideTotal === 'number') ? overrideTotal : lastFinalTotal;
-
-  // ⭐ table number = what you typed in the POS
-  const tableNumber = orderNumber;
+  const paidTotal =
+    typeof overrideTotal === 'number' ? overrideTotal : lastFinalTotal;
 
   const ticket = {
     id: orderId,
 
-  // ⭐ keep orderNumber but ALSO store tableNumber
+    // 🔹 Small label (local) – will be overwritten by Supabase order_number later if you want
     orderNumber,
+
+    // 🔹 Big table label used in Kitchen/Bar
     tableNumber,
 
     serviceType,
@@ -1332,32 +1477,33 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
     drinkItems
   };
 
+  // Add to in-memory boards
   kitchenOrders.push(ticket);
 
   // STEP 5: also save this paid order to Supabase in the background.
   // We don't `await` here so the POS stays responsive even if the network is slow.
   saveOrderToSupabase(ticket);
 
-// Record to CSV source (paid orders only) — now includes item lines
-completedOrders.push({
-  id: orderId,
-  orderNumber,
-  serviceType,
-  channel,
-  createdAt,
-  completedAt: null,
-  paidAt: createdAt,
-  paymentMethod,
-  total: paidTotal,
-  items: [
-    ...(foodItems || []),
-    ...(drinkItems || [])
-  ].map(it => ({
-    name: it.displayName || it.name || '',
-    category: it.cat || '',
-    amount: Number(it.final ?? it.price ?? 0) || 0
-  }))
-});
+  // Record to CSV source (paid orders only) — now includes item lines
+  completedOrders.push({
+    id: orderId,
+    orderNumber,
+    serviceType,
+    channel,
+    createdAt,
+    completedAt: null,
+    paidAt: createdAt,
+    paymentMethod,
+    total: paidTotal,
+    items: [
+      ...(foodItems || []),
+      ...(drinkItems || [])
+    ].map(it => ({
+      name: it.displayName || it.name || '',
+      category: it.cat || '',
+      amount: Number(it.final ?? it.price ?? 0) || 0
+    }))
+  });
 
   // clear POS
   order = [];
@@ -1366,15 +1512,17 @@ completedOrders.push({
   updateOrder();
 
   if (orderNumberInput) orderNumberInput.value = '';
-  if (pickupInput) pickupInput.value = '';
+  if (pickupInput)      pickupInput.value = '';
+
+  // ⭐ Reset service type + table selection back to default (堂食)
+  resetServiceTypeAndTable();
 
   payModal.style.display = 'none';
 
   renderKitchenView();
   renderBarView();
   renderAllOrdersView();
-
-if (adminUnlocked) renderAdminView();
+  if (adminUnlocked) renderAdminView();
 }
 
 // ----------------------
@@ -1508,6 +1656,35 @@ function renderTicketItemLine(item, orderId, index, kind) {
   `;
 }
 
+// 🧠 Helper: decide what to show in the BIG header label
+// - Dine-in   → "TABLE 3"
+// - 現場外賣   → "現場外賣" (no table number)
+// - 電話外賣   → "電話外賣"
+// - Deliveroo → "Deliveroo"
+// - JustEat   → "JustEat"
+// - No table + unknown type → empty
+function getTicketTableLabel(orderObj) {
+  const st = orderObj.serviceType || '';
+  const tableNo = orderObj.tableNumber;
+
+  // ✅ Dine-in still shows table number
+  if (st === 'dine-in') {
+    // If for some reason no table number, keep old "TABLE -" behaviour
+    return tableNo ? `TABLE ${tableNo}` : 'TABLE -';
+  }
+
+  // ✅ Takeaway / phone orders: show service type (no "TABLE -")
+  if (st === 'takeaway') return '現場外賣';
+  if (st === 'phone')    return '電話外賣';
+
+  // ✅ Delivery platforms: show platform name (no "TABLE -")
+  if (st === 'deliveroo') return 'Deliveroo';
+  if (st === 'justeat')   return 'JustEat'; // change to 'Just Eat' if you prefer the space
+
+  // 🔙 Fallback: if we *do* have a table number, show it, otherwise show nothing
+  return tableNo ? `TABLE ${tableNo}` : '';
+}
+
 // ----------------------
 // Kitchen view (food only)
 // ----------------------
@@ -1523,17 +1700,17 @@ function renderKitchenView() {
 const ticketClass =
   orderObj.serviceType === 'deliveroo' ? 'ticket ticket-deliveroo' :
   orderObj.serviceType === 'justeat'   ? 'ticket ticket-justeat'   :
-  orderObj.serviceType === 'onsite'    ? 'ticket ticket-onsite'    :
-  orderObj.serviceType === 'tel'       ? 'ticket ticket-tel'       :
+  orderObj.serviceType === 'takeaway'    ? 'ticket ticket-takeaway'    :
+  orderObj.serviceType === 'phone'       ? 'ticket ticket-phone'       :
   'ticket';
 
     html += `
       <div class="${ticketClass}">
         <div class="ticket-header">
 
-          <!-- ⭐ BIG table number -->
+          <!-- ⭐ BIG table number or service type -->
           <div class="ticket-table">
-            TABLE ${orderObj.tableNumber || '-'}
+            ${getTicketTableLabel(orderObj)}
           </div>
 
           <!-- ⭐ small meta block (order#, time, type) -->
@@ -1541,8 +1718,8 @@ const ticketClass =
             <div class="order-number">${orderObj.orderNumber || ''}</div>
             <div class="badge">${
               orderObj.serviceType === 'dine-in'  ? '堂食' :
-              orderObj.serviceType === 'onsite'   ? '現場外賣'  :
-              orderObj.serviceType === 'tel'      ? '電話外賣' :
+              orderObj.serviceType === 'takeaway'   ? '現場外賣'  :
+              orderObj.serviceType === 'phone'      ? '電話外賣' :
               orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
               orderObj.serviceType === 'justeat'  ? 'Just Eat' :
               orderObj.serviceType || ''
@@ -1580,8 +1757,8 @@ function renderBarView() {
 const ticketClass =
   orderObj.serviceType === 'deliveroo' ? 'ticket ticket-deliveroo' :
   orderObj.serviceType === 'justeat'   ? 'ticket ticket-justeat'   :
-  orderObj.serviceType === 'onsite'    ? 'ticket ticket-onsite'    :
-  orderObj.serviceType === 'tel'       ? 'ticket ticket-tel'       :
+  orderObj.serviceType === 'takeaway'    ? 'ticket ticket-takeaway'    :
+  orderObj.serviceType === 'phone'       ? 'ticket ticket-phone'       :
   'ticket';
 
     html += `
@@ -1590,7 +1767,7 @@ const ticketClass =
 
           <!-- ⭐ BIG table number -->
           <div class="ticket-table">
-            TABLE ${orderObj.tableNumber || '-'}
+            ${getTicketTableLabel(orderObj)}
           </div>
 
           <!-- ⭐ small meta block (order#, time, type) -->
@@ -1598,8 +1775,8 @@ const ticketClass =
             <div class="order-number">${orderObj.orderNumber || ''}</div>
             <div class="badge">${
               orderObj.serviceType === 'dine-in'  ? '堂食' :
-              orderObj.serviceType === 'onsite'   ? '現場外賣'  :
-              orderObj.serviceType === 'tel'      ? '電話外賣' :
+              orderObj.serviceType === 'takeaway'   ? '現場外賣'  :
+              orderObj.serviceType === 'phone'      ? '電話外賣' :
               orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
               orderObj.serviceType === 'justeat'  ? 'Just Eat' :
               orderObj.serviceType || ''
@@ -1635,15 +1812,15 @@ function renderAllOrdersView() {
 function getTicketClass(orderObj) {
   if (orderObj.serviceType === 'deliveroo') return 'ticket ticket-deliveroo';
   if (orderObj.serviceType === 'justeat')   return 'ticket ticket-justeat';
-  if (orderObj.serviceType === 'onsite')    return 'ticket ticket-onsite';
-  if (orderObj.serviceType === 'tel')       return 'ticket ticket-tel';
+  if (orderObj.serviceType === 'takeaway')    return 'ticket ticket-takeaway';
+  if (orderObj.serviceType === 'phone')       return 'ticket ticket-phone';
   return 'ticket';
 }
 
   function renderStatusBadgeType(orderObj) {
     return orderObj.serviceType === 'dine-in'  ? '堂食' :
-           orderObj.serviceType === 'onsite'   ? '現場外賣'  :
-           orderObj.serviceType === 'tel'      ? '電話外賣' :
+           orderObj.serviceType === 'takeaway'   ? '現場外賣'  :
+           orderObj.serviceType === 'phone'      ? '電話外賣' :
            orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
            orderObj.serviceType === 'justeat'  ? 'Just Eat' :
            orderObj.serviceType || '';
@@ -1734,7 +1911,7 @@ function getTicketClass(orderObj) {
 
           <!-- ⭐ BIG table number -->
           <div class="ticket-table">
-            TABLE ${orderObj.tableNumber || '-'}
+            ${getTicketTableLabel(orderObj)}
           </div>
 
           <!-- ⭐ right-side meta (order#, status, type, payment, time) -->
@@ -2024,7 +2201,7 @@ document.getElementById('kitchen-orders').addEventListener('click', handleTicket
 document.getElementById('bar-orders').addEventListener('click', handleTicketClick);
 
 // All orders click delegation: Pay (whole order) + Retrieve (per item)
-document.getElementById('all-orders').addEventListener('click', e => {
+document.getElementById('all-orders').addEventListener('click', async e => {
 
   // ✅ EDIT (per item) in All Orders
   const editBtn = e.target.closest('.ticket-edit-btn');
@@ -2106,8 +2283,9 @@ document.getElementById('all-orders').addEventListener('click', e => {
 
   if (!orderId || Number.isNaN(index)) return;
 
+  // 🔍 Pick the correct collection (archived vs active)
   const collection = isArchived ? archivedOrders : kitchenOrders;
-  const orderObj = collection.find(o => o.id === orderId);
+  const orderObj   = collection.find(o => o.id === orderId);
   if (!orderObj) return;
 
   const items = (kind === 'food') ? orderObj.foodItems : orderObj.drinkItems;
@@ -2122,6 +2300,12 @@ document.getElementById('all-orders').addEventListener('click', e => {
     kitchenOrders.push(orderObj);
   }
 
+  // 3️⃣ IMPORTANT: push the new item statuses back to Supabase,
+  //    otherwise the 5-second poll will reload the old "complete" value
+  //    and your Retrieve will get undone.
+  await saveTicketItemsToSupabase(orderObj);
+
+  // 4️⃣ Re-render all boards with the updated state
   renderKitchenView();
   renderBarView();
   renderAllOrdersView();
@@ -2151,8 +2335,8 @@ function formatTimeForCsv(iso) {
 
 function mapTypeLabel(serviceType) {
   return serviceType === 'dine-in'  ? '堂食' :
-         serviceType === 'onsite'   ? '現場外賣' :
-         serviceType === 'tel'      ? '電話外賣' :
+         serviceType === 'takeaway'   ? '現場外賣' :
+         serviceType === 'phone'      ? '電話外賣' :
          serviceType === 'deliveroo'? 'Deliveroo' :
          serviceType === 'justeat'  ? 'Just Eat' :
          serviceType || '';
@@ -2260,7 +2444,7 @@ function createUnpaidTicketFromCurrentOrder() {
     return;
   }
   if (!canUnpaidOrder()) {
-    alert('Unpaid is only for Dine-in / Onsite / Tel orders.');
+    alert('Unpaid is only for Dine-in / Takeaway / Phone orders.');
     return;
   }
 
@@ -2275,6 +2459,12 @@ function createUnpaidTicketFromCurrentOrder() {
   const orderNumber = rawTable || `#${nextOrderId++}`;
 
   const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
+
+  // ⛔ Require table for dine-in orders
+  if (serviceType === 'dine-in' && !rawTable) {
+    alert('請選擇枱號.');
+    return;
+  }
 
   let channel = pickupInput ? pickupInput.value.trim() : '';
   if (channel.length >= 5) channel = channel.slice(0, 5);
@@ -2322,9 +2512,29 @@ function createUnpaidTicketFromCurrentOrder() {
   if (orderNumberInput) orderNumberInput.value = '';
   if (pickupInput) pickupInput.value = '';
 
+  // ⭐ Reset back to 堂食 and clear table highlight
+  resetServiceTypeAndTable();
+
   renderKitchenView();
   renderBarView();
   renderAllOrdersView();
+}
+
+// Reset service type back to default (dine-in) + table buttons + toggle buttons
+function resetServiceTypeAndTable() {
+  if (typeof orderTypeSelect !== 'undefined' && orderTypeSelect) {
+    // 1) set back to 堂食
+    orderTypeSelect.value = 'dine-in';
+
+    // 2) 🔁 trigger the same logic as if the user changed it manually
+    //    (this will re-enable Cash / Card / Unpaid buttons)
+    const evt = new Event('change', { bubbles: true });
+    orderTypeSelect.dispatchEvent(evt);
+  }
+
+  // 3) Re-enable table buttons + clear selection
+  setTableButtonsEnabled(true);
+  resetTableSelection();
 }
 
 function findTicketById(orderId) {
@@ -2406,8 +2616,8 @@ function renderCustomerView() {
 
   const typeLabel =
     serviceType === 'dine-in'  ? '堂食' :
-    serviceType === 'onsite'   ? '現場外賣' :
-    serviceType === 'tel'      ? '電話外賣' :
+    serviceType === 'takeaway'   ? '現場外賣' :
+    serviceType === 'phone'      ? '電話外賣' :
     serviceType === 'deliveroo'? 'Deliveroo' :
     serviceType === 'justeat'  ? 'Just Eat' :
     serviceType || '';
@@ -2593,6 +2803,7 @@ async function loadTodayOrdersFromSupabase() {
         id: orderId,
         supabaseId: row.id,   // ⭐ THIS LINE
         orderNumber: row.order_number || '',
+        tableNumber: row.table_number   || '',
         serviceType: row.service_type || 'dine-in',
         channel: row.channel || '',
         time: createdAt
@@ -2863,8 +3074,11 @@ document.getElementById('waitlist-tbody')?.addEventListener('click', (e) => {
   renderWaitlist();
   applyTabAccessMode();
 
+  // ⭐ wire up the table buttons
+  initTableButtons();
+
   // RESTORE THE LAST ACTIVE TAB HERE
-  const savedTab = localStorage.getItem('lionrock_pos_active_tab') || 'pos';
+  let savedTab = localStorage.getItem('lionrock_pos_active_tab') || 'pos-view';
   switchToView(savedTab);
 
   // 🔁 POLLING: refresh boards every 5 seconds

@@ -484,10 +484,12 @@ body{
     display: flex;
     align-items: center;
     margin-bottom: 4px;
+    gap: 10px;
   }
   .order-meta-row label {
     width: 80px;
     color: #555;
+    white-space: nowrap;
   }
   .order-meta-row input,
   .order-meta-row select {
@@ -1116,6 +1118,49 @@ body{
 
 .ais-qty{
   font-weight:800;
+}
+
+/* Container */
+.table-selector {
+  width: 100%;
+}
+
+/* One single row, equal-width buttons */
+.table-buttons {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+/* Buttons */
+.table-btn {
+  padding: 10px 0;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #f7f7f7;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  transition: all .15s ease;
+}
+
+/* Hover feedback */
+.table-btn:hover {
+  background: #eee;
+}
+
+/* Selected table button */
+.table-btn.active {
+  border-color: #000;
+  background: #ffe66d;
+  font-weight: 700;
+}
+
+.table-btn.disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* Responsive: tablet portrait */
