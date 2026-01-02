@@ -556,9 +556,11 @@ body{
 
   /* 🔴 BIG + CLEAR table number */
   .ticket-table {
-    font-size: 28px;
-    font-weight: 900;
-    color: #222;
+    display: flex;
+    align-items: center;
+    gap: 8px;           /* space between title, badge, button */
+    font-size: 28px;    /* adjust to taste */
+    font-weight: bold;
   }
 
   /* 🔵 Right-side details */
@@ -601,12 +603,12 @@ body{
   }
 
   /* Special backgrounds for onsite and tel orders */
-  .ticket-onsite {
+  .ticket-takeaway {
     background: #e6f7e6;  /* light green */
   }
 
-  .ticket-tel {
-    background: #f0e8ff;  /* light purple */
+  .ticket-phone {
+    background: #e6f7e6;  /* light green */
   }
 
   /* Retrieve button in All orders */
@@ -622,12 +624,14 @@ body{
 
 /* Pay button styled like Retrieve */
 .pay-pending-btn {
-  padding: 4px 10px;
+  margin-left: 12px;
+  padding: 8px 16px;
+  font-size: 0.9em;
   border-radius: 999px;
-  border: 1px solid #1976d2;
-  background: #e3f2fd;
+  border: 1px solid #ccc;
+  background: #f8f9fa;
+  line-height: 1.2;
   cursor: pointer;
-  font-size: 0.8em;
   white-space: nowrap;
 }
 .pay-pending-btn:active {
@@ -1161,6 +1165,51 @@ body{
 .table-btn.disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* ⭐ In Kitchen + Bar, stack title + pickup vertically and align left */
+#kitchen-view .ticket-table,
+#bar-view .ticket-table {
+  flex-direction: column;     /* title on top, pickup under */
+  align-items: flex-start;    /* left-align the text */
+}
+
+/* main title (TABLE 3 / Deliveroo etc.) */
+.ticket-table-main {
+  font-weight: 700;
+}
+
+/* new pickup tag under the title */
+.ticket-pickup {
+  font-size: 14px;          /* smaller than big title */
+  margin-top: 4px;          /* little gap under title */
+  opacity: 0.8;             /* slightly softer */
+  /* optional pill style:
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f0f0f0;
+  */
+}
+
+/* ⭐ In All-orders, also stack title + pickup vertically */
+#all-orders .ticket-table {
+  display: flex;          /* ensure it's flex */
+  flex-direction: column; /* title row + pickup row */
+  align-items: flex-start;
+}
+
+/* first row: title + Pay button side-by-side */
+.ticket-table-main-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;               /* space between title + Pay button */
+}
+
+/* reuse same visual style as Kitchen/Bar for pickup */
+#all-orders .ticket-pickup {
+  font-size: 14px;
+  margin-top: 4px;
+  opacity: 0.8;
 }
 
 /* Responsive: tablet portrait */

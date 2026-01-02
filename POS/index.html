@@ -196,8 +196,6 @@
   <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;background:#f0f2f5;border-bottom:1px solid #ddd;">
     <div style="display:flex;gap:10px;align-items:center;">
       <strong>Daily Sales</strong>
-      <input type="date" id="admin-date" />
-      <button type="button" id="admin-refresh" class="export-btn">Refresh</button>
     </div>
     <button id="export-csv-btn" type="button" class="export-btn">Export CSV</button>
   </div>
@@ -392,15 +390,17 @@ const menu = [
   { name:"7up", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"鴛鴦", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","yuenyeung-opts"], hotCold:true },
 
-// 套餐手動折扣
-  { name:"套餐 -£0.5", price:-0.5, cat:"飲品", optionGroups:[], hotCold:false, isManualDiscount:true },
-
   // 小食
   { name:"土匪雞翼", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
   { name:"鹵水牛展", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
   { name:"花生醬西多士", price:6.5, cat:"小食", optionGroups:["french-toast-opts"], hotCold:false },
   { name:"半份西多士", price:4.0, cat:"小食", optionGroups:["french-toast-opts"], hotCold:false },
-  { name:"炒蛋多士", price:2.0, cat:"小食", optionGroups:[], hotCold:false, excludeFromComboB:true },
+  { name:"餃子", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
+
+  // Others
+  { name:"炒蛋多士", price:2.0, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"生雲吞",    price:10.0, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"套餐 -£0.5", price:-0.5, cat:"Others", optionGroups:[], hotCold:false },
 ];
 
 let order = [];
@@ -499,7 +499,7 @@ function applyTabAccessMode() {
   switchToView('customer-view');
 }
 
-const DIRECT_ADD_CATEGORIES = ["咖喱系列", "主食", "小食"];
+const DIRECT_ADD_CATEGORIES = ["咖喱系列", "主食", "小食", "Others"];
 const DIRECT_ADD_DRINKS = [
   "Coke",
   "Zero",
@@ -539,7 +539,7 @@ function initTableButtons() {
 }
 
 function renderMenu() {
-  const catOrder = ["咖喱系列","茶記粉面","主食","飲品","小食"];
+  const catOrder = ["咖喱系列","茶記粉面","主食","飲品","小食","Others"];
   const menuContent = document.getElementById('menu-content');
 
   const itemsWithIndex = menu.map((item, index) => ({ ...item, index }));
@@ -725,19 +725,18 @@ function updateOrder() {
     if (discountBox) discountBox.textContent = '';
   } else {
     let html = '';
+
     order.forEach((o, i) => {
       subtotal += o.final; 
       let name = o.displayName;
 
-    if (!o.isManualDiscount) {
       if (o.cat === '咖喱系列' || o.cat === '茶記粉面' || o.cat === '主食') {
         mainCount++;
       } else if (o.cat === '飲品') {
         drinkCount++;
-      } else if (o.cat === '小食' && !o.excludeFromComboB) {
+      } else if (o.cat === '小食') {
         snackCount++;
       }
-    }
 
       if (o.isSpaghetti) name = name.replace(/意粉/g,'<span class="red">意粉</span>');
       if (o.swapToChicken) name = name.replace('豬扒','<span class="red">雞扒</span>');
@@ -1049,8 +1048,6 @@ document.getElementById('menu-content').addEventListener('click', e => {
       mods: [],
       cat: item.cat,
       menuIndex: index,
-      isManualDiscount: item.isManualDiscount || false,
-      excludeFromComboB: !!item.excludeFromComboB
     });
     updateOrder();
   } else {
@@ -1330,6 +1327,8 @@ async function saveOrderToSupabase(ticket) {
         // ⭐ store table number in Supabase
         table_number:  ticket.tableNumber || null,
 
+        combo_discount: ticket.comboDiscount || 0,
+
         // Combine food + drink items into one JSON array for the `items` jsonb column.
         items: [
           ...(ticket.foodItems || []),
@@ -1337,8 +1336,9 @@ async function saveOrderToSupabase(ticket) {
         ].map(it => ({
           // Keep only the bits we care about later (for reports).
           name: it.displayName || it.name || '',
-          category: it.cat || '',                  // 咖喱系列 / 飲品 / 主食 / ...
-          amount: Number(it.final ?? it.price ?? 0) || 0
+          category: it.cat || '',
+          amount: Number(it.final ?? it.price ?? 0) || 0,
+          status: it.status || 'in-progress'
         }))
       });
 
@@ -1368,9 +1368,17 @@ async function saveTicketItemsToSupabase(orderObj) {
       status: it.status || 'in-progress'
     }));
 
+    // ⭐ Build update payload
+    const updatePayload = { items: allItems };
+
+    // If order has a completion time, also update completed_at column
+    if (orderObj.completedAt) {
+      updatePayload.completed_at = orderObj.completedAt;
+    }
+
     const { error } = await supabaseClient
       .from('orders')
-      .update({ items: allItems })
+      .update(updatePayload)
       .eq('id', orderObj.supabaseId);
 
     if (error) {
@@ -1415,10 +1423,24 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
   // Order type(堂食 / 現場外賣 / 電話外賣 / Deliveroo / JustEat...)
   const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
 
+  // 🔎 read pickup time (could be empty string)
+  const pickupTime = pickupInput ? pickupInput.value.trim() : '';
+
   // ⛔ Require table for dine-in orders
   if (serviceType === 'dine-in' && !rawTable) {
     alert('請選擇枱號.');
     return;
+  }
+
+  // ⛔ NEW RULE: Deliveroo / JustEat / Phone must have pickup time
+  if (
+    (serviceType === 'deliveroo' ||
+    serviceType === 'justeat'   ||
+    serviceType === 'phone') &&
+    !pickupTime
+  ) {
+    alert('請輸入取餐時間.');
+    return;  // ❗ stop here – do NOT send order to kitchen/bar/all-orders
   }
 
   // 🟢 TABLE number = what staff chose (may be empty for takeaway/delivery)
@@ -1426,7 +1448,7 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
 
   // 🟡 Local running label for this ticket (small, internal)
   //     Supabase will later give you the real YYYYMMDD-SEQ in row.order_number
-  const orderNumber = `#${nextOrderId++}`;
+  const orderNumber = '';   // Supabase will fill this later
 
   // Channel (for pickup time / short code)
   let channel = pickupInput ? pickupInput.value.trim() : '';
@@ -1474,7 +1496,9 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
 
     amount: paidTotal,
     foodItems,
-    drinkItems
+    drinkItems,
+
+    comboDiscount: lastMealDealDiscount || 0
   };
 
   // Add to in-memory boards
@@ -1708,22 +1732,23 @@ const ticketClass =
       <div class="${ticketClass}">
         <div class="ticket-header">
 
-          <!-- ⭐ BIG table number or service type -->
-          <div class="ticket-table">
+        <!-- ⭐ BIG table number or service type + Pickup time underneath -->
+        <div class="ticket-table">
+          <div class="ticket-table-main">
             ${getTicketTableLabel(orderObj)}
           </div>
+
+          ${
+            // Only show pickup line if we actually have a pickup time (stored in channel)
+            orderObj.channel
+              ? `<div class="ticket-pickup">Pickup ${orderObj.channel}</div>`
+              : ''
+          }
+        </div>
 
           <!-- ⭐ small meta block (order#, time, type) -->
           <div class="ticket-meta">
             <div class="order-number">${orderObj.orderNumber || ''}</div>
-            <div class="badge">${
-              orderObj.serviceType === 'dine-in'  ? '堂食' :
-              orderObj.serviceType === 'takeaway'   ? '現場外賣'  :
-              orderObj.serviceType === 'phone'      ? '電話外賣' :
-              orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
-              orderObj.serviceType === 'justeat'  ? 'Just Eat' :
-              orderObj.serviceType || ''
-            }</div>
             <div class="ticket-time">${orderObj.time}</div>
           </div>
 
@@ -1765,22 +1790,22 @@ const ticketClass =
       <div class="${ticketClass}">
         <div class="ticket-header">
 
-          <!-- ⭐ BIG table number -->
-          <div class="ticket-table">
+        <!-- ⭐ BIG table number or service type + Pickup time under it -->
+        <div class="ticket-table">
+          <div class="ticket-table-main">
             ${getTicketTableLabel(orderObj)}
           </div>
+
+          ${
+            orderObj.channel
+              ? `<div class="ticket-pickup">Pickup ${orderObj.channel}</div>`
+              : ''
+          }
+        </div>
 
           <!-- ⭐ small meta block (order#, time, type) -->
           <div class="ticket-meta">
             <div class="order-number">${orderObj.orderNumber || ''}</div>
-            <div class="badge">${
-              orderObj.serviceType === 'dine-in'  ? '堂食' :
-              orderObj.serviceType === 'takeaway'   ? '現場外賣'  :
-              orderObj.serviceType === 'phone'      ? '電話外賣' :
-              orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
-              orderObj.serviceType === 'justeat'  ? 'Just Eat' :
-              orderObj.serviceType || ''
-            }</div>
             <div class="ticket-time">${orderObj.time}</div>
           </div>
 
@@ -1840,16 +1865,19 @@ function getTicketClass(orderObj) {
 
     const isPendingPay = (orderObj.paymentStatus === 'pending');
 
+    // ✅ Only show badge when unpaid.
+    //    Paid orders get NO badge at all.
     const paymentBadge = isPendingPay
-      ? `<span class="badge badge-pending">Pending for payment</span>`
-      : `<span class="badge badge-paid">Paid</span>`;
-
-    const payBtnHtml = isPendingPay
-      ? `<button type="button" class="pay-pending-btn" data-order-id="${orderObj.id}">Pay</button>`
+      ? `<span class="badge badge-pending">待付款</span>`
       : '';
 
-    const itemsHtml = allItems.map(entry => {
-      const it   = entry.item;
+    // ✅ Pay button also only for unpaid orders.
+      const payBtnHtml = isPendingPay
+        ? `<button type="button" class="pay-pending-btn" data-order-id="${orderObj.id}">Pay</button>`
+        : '';
+
+      const itemsHtml = allItems.map(entry => {
+        const it   = entry.item;
       const kind = entry.kind;
       const idx  = entry.index;
 
@@ -1905,46 +1933,60 @@ function getTicketClass(orderObj) {
       `;
     }).join('');
 
-    return `
-      <div class="${getTicketClass(orderObj)}">
-        <div class="ticket-header">
+  return `
+    <div class="${getTicketClass(orderObj)}">
+      <div class="ticket-header">
 
-          <!-- ⭐ BIG table number -->
-          <div class="ticket-table">
-            ${getTicketTableLabel(orderObj)}
+        <!-- LEFT SIDE: Title + Pay button + Pickup under title -->
+        <div class="ticket-table">
+          <!-- first row: title + Pay button -->
+          <div class="ticket-table-main-row">
+            <span class="ticket-table-main">
+              ${getTicketTableLabel(orderObj)}
+            </span>
+            ${payBtnHtml}
           </div>
 
-          <!-- ⭐ right-side meta (order#, status, type, payment, time) -->
-          <div class="ticket-meta">
-            <div class="order-number">${orderObj.orderNumber || ''}</div>
-            <div>
-              <span class="badge">${statusLabel}</span>
-              <span class="badge">${renderStatusBadgeType(orderObj)}</span>
-              ${orderObj.channel ? `<span class="badge">Pickup ${orderObj.channel}</span>` : ''}
-            </div>
-            <div>
-              ${paymentBadge}
-              ${payBtnHtml}
-            </div>
-            <div class="ticket-time">${orderObj.time || ''}</div>
+          <!-- second row: pickup time under title (only if exists) -->
+          ${
+            orderObj.channel
+              ? `<div class="ticket-pickup">Pickup ${orderObj.channel}</div>`
+              : ''
+          }
+        </div>
+
+        <!-- ⭐ right-side meta (order#, status, payment, time) -->
+        <div class="ticket-meta">
+          <div class="order-number">${orderObj.orderNumber || ''}</div>
+          <div>
+            <span class="badge">${statusLabel}</span>
+            <!-- ❌ removed small Pickup badge here to avoid duplication -->
+            <!-- ${orderObj.channel ? `<span class="badge">Pickup ${orderObj.channel}</span>` : ''} -->
           </div>
-
+          <div>
+            ${paymentBadge}
+          </div>
+          <div class="ticket-time">${orderObj.time || ''}</div>
         </div>
 
-        <div class="ticket-body">
-          ${itemsHtml}
-        </div>
       </div>
-    `;
+
+      <div class="ticket-body">
+        ${itemsHtml}
+      </div>
+    </div>
+  `;
   }
 
   // Active (still in kitchenOrders)
-  kitchenOrders.forEach(o => {
+  // 🔁 Show newest first by reversing a copy of the array
+  kitchenOrders.slice().reverse().forEach(o => {
     html += renderOverviewCard(o, 'In progress', false);
   });
 
   // Fully completed / archived
-  archivedOrders.forEach(o => {
+  // 🔁 Same idea: latest completed at the top of the completed section
+  archivedOrders.slice().reverse().forEach(o => {
     html += renderOverviewCard(o, 'Completed', true);
   });
 
@@ -1976,21 +2018,16 @@ function buildBucketPivot(itemRows) {
 
 function renderAdminView() {
   const wrap = document.getElementById('admin-summary');
-  const dateInput = document.getElementById('admin-date');
-  if (!wrap || !dateInput) return;
+  if (!wrap) return;   // ✅ only check that the admin container exists
 
-  // default date = today
-  if (!dateInput.value) {
+  // ✅ Always use TODAY as the selected date (local time)
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
-    dateInput.value = `${yyyy}-${mm}-${dd}`;
-  }
+    const selected = `${yyyy}-${mm}-${dd}`;
 
-  const selected = dateInput.value; // yyyy-mm-dd
-
-  // filter by paidAt date (local)
+  // filter by paidAt date (local) for TODAY only
   const todays = completedOrders.filter(o => {
     const iso = o.paidAt || o.createdAt || '';
     if (!iso) return false;
@@ -2190,6 +2227,9 @@ if (allFoodDone && allDrinkDone) {
     summary.completedAt = completionTime;
   }
 }
+
+  // 🔄 Now sync to Supabase (items + maybe completed_at)
+  await saveTicketItemsToSupabase(orderObj);
 
   renderKitchenView();
   renderBarView();
@@ -2426,18 +2466,6 @@ if (exportBtn) {
   exportBtn.addEventListener('click', exportCsv);
 }
 
-// Admin refresh (daily sales)
-const adminRefreshBtn = document.getElementById('admin-refresh');
-const adminDateInput = document.getElementById('admin-date');
-
-if (adminRefreshBtn) {
-  adminRefreshBtn.addEventListener('click', renderAdminView);
-}
-
-if (adminDateInput) {
-  adminDateInput.addEventListener('change', renderAdminView);
-}
-
 function createUnpaidTicketFromCurrentOrder() {
   if (!order.length) {
     alert('No items in the order.');
@@ -2456,15 +2484,34 @@ function createUnpaidTicketFromCurrentOrder() {
   const pickupInput = document.getElementById('pickup-time');
 
   const rawTable = orderNumberInput ? orderNumberInput.value.trim() : '';
-  const orderNumber = rawTable || `#${nextOrderId++}`;
 
   const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
+
+  // 🔎 read pickup time (could be empty string)
+  const pickupTime = pickupInput ? pickupInput.value.trim() : '';
 
   // ⛔ Require table for dine-in orders
   if (serviceType === 'dine-in' && !rawTable) {
     alert('請選擇枱號.');
     return;
   }
+
+  // ⛔ NEW RULE: Deliveroo / JustEat / phone must have pickup time
+  if (
+    (serviceType === 'deliveroo' ||
+     serviceType === 'justeat'   ||
+     serviceType === 'phone') &&
+    !pickupTime
+  ) {
+    alert('請輸入取餐時間.');
+    return; // ❗ stop here – DO NOT send order to kitchen/bar/all-orders
+  }
+
+  // 🟢 TABLE number used by the Kitchen/Bar header logic
+  const tableNumber = (serviceType === 'dine-in') ? rawTable : '';
+
+  //     Keep this consistent with paid orders
+  const orderNumber = '';   // Supabase will fill this later
 
   let channel = pickupInput ? pickupInput.value.trim() : '';
   if (channel.length >= 5) channel = channel.slice(0, 5);
@@ -2487,6 +2534,7 @@ function createUnpaidTicketFromCurrentOrder() {
   const ticket = {
     id: orderId,
     orderNumber,
+    tableNumber,
     serviceType,
     channel,
     time: timeStr,
@@ -2501,7 +2549,16 @@ function createUnpaidTicketFromCurrentOrder() {
     drinkItems
   };
 
+  // 🧾 Add to local kitchen board
   kitchenOrders.push(ticket);
+
+  // 🌐 NEW: also save this unpaid ticket into Supabase.
+  //     - payment_status will be "pending"
+  //     - this ensures the 5s reload sees the order and keeps it visible
+  //     - we do NOT await here so the POS stays responsive
+  if (typeof saveOrderToSupabase === 'function') {
+    saveOrderToSupabase(ticket);
+  }
 
   // clear POS
   order = [];
@@ -2541,43 +2598,54 @@ function findTicketById(orderId) {
   return kitchenOrders.find(o => o.id === orderId) || archivedOrders.find(o => o.id === orderId) || null;
 }
 
-function payExistingTicket(method, overrideTotal = null) {
+// 🧾 Pay an EXISTING ticket (e.g. previously Unpaid)
+async function payExistingTicket(method, overrideTotal = null) {
   const ticket = findTicketById(payingOrderId);
   if (!ticket) {
     payingOrderId = null;
     return;
   }
 
-  // mark paid on ticket itself (kitchen/archived)
+  // 1️⃣ Mark as paid in local memory (so UI updates immediately)
   ticket.paymentStatus = 'paid';
   ticket.paymentMethod = method;
   ticket.paidAt = new Date().toISOString();
 
-  const paidTotal = (typeof overrideTotal === 'number') ? overrideTotal : (ticket.amount ?? lastFinalTotal);
+  // Use overrideTotal if provided; otherwise use existing ticket.amount or lastFinalTotal
+  const paidTotal = (typeof overrideTotal === 'number')
+    ? overrideTotal
+    : (ticket.amount ?? lastFinalTotal);
 
-completedOrders.push({
-  id: ticket.id,
-  orderNumber: ticket.orderNumber,
-  serviceType: ticket.serviceType,
-  channel: ticket.channel,
-  createdAt: ticket.createdAt,
-  completedAt: ticket.completedAt || null,
-  paidAt: ticket.paidAt,
-  paymentMethod: method,
-  total: paidTotal,
+  // Keep the ticket's amount in sync with what we actually charged
+  ticket.amount = paidTotal;
 
-  // ✅ NEW: store items for CSV + admin pivot
-  items: [
-    ...(ticket.foodItems || []),
-    ...(ticket.drinkItems || [])
-  ].map(it => ({
-    name: it.displayName || it.name || '',
-    category: it.cat || '',
-    amount: Number(it.final ?? it.price ?? 0) || 0
-  }))
-});
+  // 2️⃣ NEW: Update payment info in Supabase so the 5s poll sees it as PAID,
+  //    not "pending" anymore. We don't need to await this for UI to feel instant,
+  //    but making this function async allows us to await if we want.
+  updatePaymentInSupabase(ticket);
 
-  // clear POS
+  // 3️⃣ Record in completedOrders (for admin / CSV etc.)
+  completedOrders.push({
+    id: ticket.id,
+    orderNumber: ticket.orderNumber,
+    serviceType: ticket.serviceType,
+    channel: ticket.channel,
+    createdAt: ticket.createdAt,
+    completedAt: ticket.completedAt || null,
+    paidAt: ticket.paidAt,
+    paymentMethod: ticket.paymentMethod,
+    total: paidTotal,
+    items: [
+      ...(ticket.foodItems || []),
+      ...(ticket.drinkItems || [])
+    ].map(it => ({
+      name: it.displayName || it.name || '',
+      category: it.cat || '',
+      amount: Number(it.final ?? it.price ?? 0) || 0
+    }))
+  });
+
+  // 4️⃣ Clear POS state
   payingOrderId = null;
   order = [];
   isCash = false;
@@ -2585,11 +2653,11 @@ completedOrders.push({
 
   if (payModal) payModal.style.display = 'none';
 
+  // 5️⃣ Re-render boards so payment badge updates to "Paid"
   renderAllOrdersView();
   renderKitchenView();
   renderBarView();
-
-if (adminUnlocked) renderAdminView();
+  if (adminUnlocked) renderAdminView();
 }
 
 function renderCustomerView() {
@@ -2814,7 +2882,11 @@ async function loadTodayOrdersFromSupabase() {
             })
           : '',
         createdAt,
-        paymentStatus: 'paid',
+
+        // 🧠 Use the real payment_status from Supabase
+        //     - 'pending'  → Unpaid ticket
+        //     - 'paid'     → normal paid order
+        paymentStatus: row.payment_status || 'paid',
         paymentMethod: row.payment_method || null,
         paidAt,
         amount,
@@ -3054,6 +3126,48 @@ document.getElementById('waitlist-tbody')?.addEventListener('click', (e) => {
     }
   }
 });
+
+// 🔄 Update payment info in Supabase for an existing order
+// - Sets payment_status to 'paid'
+// - Saves payment_method, paid_at, and amount
+async function updatePaymentInSupabase(ticket) {
+  // If Supabase is not available, just log and skip
+  if (typeof supabaseClient === 'undefined') {
+    console.warn('Supabase client not found – skipping payment update.');
+    return;
+  }
+
+  // Build the fields we want to update in the DB
+  const payload = {
+    payment_status: ticket.paymentStatus,  // 'paid' / 'pending'
+    payment_method: ticket.paymentMethod,  // 'cash' / 'card' / etc.
+    paid_at:        ticket.paidAt,
+    amount:         ticket.amount
+  };
+
+  try {
+    // Prefer updating by Supabase row id if we have it (loaded from DB)
+    let query = supabaseClient
+      .from('orders')
+      .update(payload);
+
+    if (ticket.supabaseId) {
+      // ✅ Case 1: ticket came from Supabase and we know its row id
+      query = query.eq('id', ticket.supabaseId);
+    } else {
+      // ✅ Case 2: ticket was just inserted (Unpaid) and we don't yet have supabaseId
+      // Fallback: use order_number as a unique identifier
+      query = query.eq('order_number', ticket.orderNumber);
+    }
+
+    const { error } = await query;
+    if (error) {
+      console.error('Failed to update payment in Supabase:', error.message);
+    }
+  } catch (err) {
+    console.error('Unexpected error while updating payment in Supabase:', err);
+  }
+}
 
 // Initial render
 // We wrap startup in an async IIFE so we can await data (waitlist + today's
