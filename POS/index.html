@@ -992,6 +992,13 @@ document.getElementById('add').addEventListener('click', () => {
           amount: Number(it.final ?? it.price ?? 0) || 0
         }));
       }
+
+      // ⭐ NEW: push updated items (including mods) to Supabase
+      // saveTicketItemsToSupabase already:
+      //   - rebuilds items with { name, category, amount, status, mods }
+      //   - checks ticket.supabaseId
+      //   - updates the `items` (and completed_at if present) in the orders row
+      saveTicketItemsToSupabase(ticket);
     }
 
     // cleanup + refresh views
@@ -1338,7 +1345,10 @@ async function saveOrderToSupabase(ticket) {
           name: it.displayName || it.name || '',
           category: it.cat || '',
           amount: Number(it.final ?? it.price ?? 0) || 0,
-          status: it.status || 'in-progress'
+          status: it.status || 'in-progress',
+          mods: Array.isArray(it.mods) ? it.mods : [],
+          menuIndex: (typeof it.menuIndex === 'number') ? it.menuIndex : null,
+          isSetMeal: !!it.isSetMeal
         }))
       });
 
@@ -1365,7 +1375,10 @@ async function saveTicketItemsToSupabase(orderObj) {
       name: it.displayName || it.name || '',
       category: it.cat || '',
       amount: Number(it.final ?? it.price ?? 0) || 0,
-      status: it.status || 'in-progress'
+      status: it.status || 'in-progress',
+      mods: Array.isArray(it.mods) ? it.mods : [],
+      menuIndex: (typeof it.menuIndex === 'number') ? it.menuIndex : null,
+      isSetMeal: !!it.isSetMeal
     }));
 
     // ⭐ Build update payload
@@ -2848,16 +2861,20 @@ async function loadTodayOrdersFromSupabase() {
 
       rawItems.forEach(it => {
         const cat = it.category || '';
-        const status = it.status || 'in-progress';  // ⭐ read from DB
+        const status = it.status || 'in-progress';
+        const mods = Array.isArray(it.mods) ? it.mods : [];
+        const menuIndex = (typeof it.menuIndex === 'number') ? it.menuIndex : null;
+        const isSetMeal = !!it.isSetMeal;
 
         const base = {
           displayName: it.name || '',
           name: it.name || '',
           cat,
           final: Number(it.amount || 0) || 0,
-          mods: [],
-          isSetMeal: false,
-          status
+          mods,
+          isSetMeal,
+          status,
+          menuIndex
         };
 
         if (cat === '飲品' || cat.includes('飲品')) {
