@@ -227,13 +227,19 @@
           <div class="opt">少冰</div><div class="opt">走冰</div><div class="opt">煉奶</div><div class="opt">少甜</div>
         </div>
 
+        <!-- 檸茶 & 檸水 -->
+        <div class="opts" id="lemon-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div>
+        </div>
+
         <!-- 柚子薑蜜 -->
         <div class="opts" id="citron-opts" style="display:none;">
-          <div class="opt">少冰</div><div class="opt">走冰</div>
+          <div class="opt">凍</div><div class="opt">少冰</div><div class="opt">走冰</div>
         </div>
 
         <!-- 奶茶專用 -->
         <div class="opts" id="milktea-opts" style="display:none;">
+          <div class="opt">少花奶</div><div class="opt">多花奶</div><div class="opt">英國版</div>
           <div class="opt">少冰</div><div class="opt">走冰</div><div class="opt">冰底</div>
           <div class="opt">煉奶</div><div class="opt">少甜</div>
         </div>
@@ -241,7 +247,7 @@
         <!-- 咖啡專用 -->
         <div class="opts" id="coffee-opts" style="display:none;">
           <div class="opt">少冰</div><div class="opt">走冰</div>
-          <div class="opt">花奶</div><div class="opt">少花奶</div><div class="opt">煉奶</div><div class="opt">少甜</div>
+          <div class="opt">牛奶</div><div class="opt">花奶</div><div class="opt">少奶</div><div class="opt">煉奶</div><div class="opt">少甜</div>
         </div>
 
         <!-- 鴛鴦專用 -->
@@ -262,14 +268,19 @@
         </div>
         <div class="opts" id="tomato-baked-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div><div class="opt">多菠蘿</div>
-          <div class="opt">走菠蘿</div><div class="opt">走芝士</div><div class="opt">轉雞扒</div><div class="opt">免焗</div>
+          <div class="opt">走菠蘿</div><div class="opt">轉雞扒</div><div class="opt">多芝士</div><div class="opt">少芝士</div><div class="opt">走芝士</div><div class="opt">免焗</div>
         </div>
         <div class="opts" id="portuguese-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div>
-          <div class="opt">走芝士</div><div class="opt">轉豬扒</div><div class="opt">免焗</div>
+          <div class="opt">轉豬扒</div>
+          <div class="opt">多芝士</div><div class="opt">少芝士</div><div class="opt">走芝士</div><div class="opt">免焗</div>
         </div>
         <div class="opts" id="charsiu-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">煎熟蛋</div><div class="opt">撈粗</div><div class="opt">走乾蒜</div>
+        </div>
+        <div class="opts" id="kimchi-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div>
+          <div class="opt">多泡菜</div><div class="opt">少泡菜</div><div class="opt">走泡菜</div><div class="opt">走乾蒜</div>
         </div>
         <div class="opts" id="basic-rice-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div>
@@ -280,7 +291,8 @@
         </div>
         <div class="opts" id="baked-curry-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div><div class="opt">多薯仔</div>
-          <div class="opt">少薯仔</div><div class="opt">走薯仔</div><div class="opt">走芝士</div><div class="opt">免焗</div>
+          <div class="opt">少薯仔</div><div class="opt">走薯仔</div>
+          <div class="opt">多芝士</div><div class="opt">少芝士</div><div class="opt">走芝士</div><div class="opt">免焗</div>
         </div>
         <div class="opts" id="spring-onion-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">撈丁</div><div class="opt">撈粗</div>
@@ -371,24 +383,25 @@ const menu = [
   { name:"葡汁焗雞扒飯", price:12.5, cat:"主食", optionGroups:["portuguese-opts"], hotCold:false },
   { name:"蔥油雞扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"蔥油雞扒煎蛋撈粗", loRamenName:"蔥油雞扒煎蛋撈拉麵", loDingName:"蔥油雞扒煎蛋撈丁", SoupVermicelliName:"蔥油雞扒煎蛋湯米", SoupMacaroniName:"蔥油雞扒煎蛋湯通", SoupSpaghettiName:"蔥油雞扒煎蛋湯意" },
   { name:"蔥油豬扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"蔥油豬扒煎蛋撈粗", loRamenName:"蔥油豬扒煎蛋撈拉麵", loDingName:"蔥油豬扒煎蛋撈丁", SoupVermicelliName:"蔥油豬扒煎蛋湯米", SoupMacaroniName:"蔥油豬扒煎蛋湯通", SoupSpaghettiName:"蔥油豬扒煎蛋湯意"  },
-  { name:"泡菜五花腩飯", price:11.5, cat:"主食", optionGroups:["basic-rice-opts"], hotCold:false },
+  { name:"泡菜五花腩飯", price:11.5, cat:"主食", optionGroups:["kimchi-opts"], hotCold:false },
   { name:"滑蛋鰻魚飯", price:13.5, cat:"主食", optionGroups:["basic-rice-opts"], hotCold:false },
 
   // 飲品
   { name:"奶茶", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","milktea-opts"], hotCold:true },
   { name:"粒粒椰汁紅豆冰", price:4.0, cat:"飲品", optionGroups:["redbean-opts"], hotCold:false },
-  { name:"檸茶", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts"], hotCold:true },
+  { name:"檸茶", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts", "lemon-opts"], hotCold:true },
   { name:"檸水", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts"], hotCold:true },
   { name:"凍咸檸七", price:3.5, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"好立克", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
   { name:"阿華田", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
-  { name:"柚子薑蜜", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","citron-opts"], hotCold:true },
+  { name:"柚子薑蜜", price:3.0, cat:"飲品", optionGroups:[,"citron-opts"], hotCold:true },
   { name:"凍檸樂", price:2.5, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"咖啡", price:2.0, cat:"飲品", optionGroups:["hot-cold-opts","coffee-opts"], hotCold:true },
   { name:"Coke", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"Zero", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"7up", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"鴛鴦", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","yuenyeung-opts"], hotCold:true },
+  { name:"紅茶", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
 
   // 小食
   { name:"土匪雞翼", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
@@ -508,6 +521,7 @@ const DIRECT_ADD_DRINKS = [
   "凍咸檸七",
   "柚子薑蜜",
   "粒粒椰汁紅豆冰",
+  "紅茶",
   "套餐 -£0.5",
 ];
 
@@ -543,15 +557,66 @@ function renderMenu() {
   const menuContent = document.getElementById('menu-content');
 
   const itemsWithIndex = menu.map((item, index) => ({ ...item, index }));
+
   const html = catOrder.map(cat => {
     const items = itemsWithIndex.filter(i => i.cat === cat);
     if (!items.length) return '';
-    const itemsHtml = items.map(item => `
-      <button type="button" class="item" data-index="${item.index}">
-        <h3>${item.name}</h3>
-        <div class="price">£${item.price.toFixed(2)}</div>
-      </button>
-    `).join('');
+
+    let itemsHtml;
+
+    /*
+      We want ONLY these 6 curry rice dishes to always appear as:
+
+        Row 1: 咖喱雞扒飯  咖喱豬扒飯  咖喱牛腩飯
+        Row 2: 焗咖喱雞扒飯 焗咖喱豬扒飯 焗咖喱牛腩飯
+
+      So inside the 咖喱系列 category we:
+      - pick out just these 6 items into a separate array (curryItems)
+      - render them inside <div class="curry-group">, which has a 3-column grid in CSS
+      - render all the other items (otherItems) normally after that
+
+      This keeps the rest of the menu layout unchanged and applies the special
+      3-per-row layout only to the curry group.
+    */
+    if (cat === '咖喱系列') {
+      const curryNames = [
+        '咖喱雞扒飯', '咖喱豬扒飯', '咖喱牛腩飯',
+        '焗咖喱雞扒飯', '焗咖喱豬扒飯', '焗咖喱牛腩飯'
+      ];
+
+      const curryItems = items.filter(i => curryNames.includes(i.name));
+      const otherItems = items.filter(i => !curryNames.includes(i.name));
+
+      const curryHtml = curryItems.map(item => `
+        <button type="button" class="item" data-index="${item.index}">
+          <h3>${item.name}</h3>
+          <div class="price">£${item.price.toFixed(2)}</div>
+        </button>
+      `).join('');
+
+      const othersHtml = otherItems.map(item => `
+        <button type="button" class="item" data-index="${item.index}">
+          <h3>${item.name}</h3>
+          <div class="price">£${item.price.toFixed(2)}</div>
+        </button>
+      `).join('');
+
+      itemsHtml = `
+        <div class="curry-group">
+          ${curryHtml}
+        </div>
+        ${othersHtml}
+      `;
+    } else {
+      // All other categories render as before
+      itemsHtml = items.map(item => `
+        <button type="button" class="item" data-index="${item.index}">
+          <h3>${item.name}</h3>
+          <div class="price">£${item.price.toFixed(2)}</div>
+        </button>
+      `).join('');
+    }
+
     return `
       <div class="category">
         <h2>${cat}</h2>
@@ -752,8 +817,6 @@ function updateOrder() {
       if (o.isSoupSpaghetti) name = name.replace('湯意','<span class="red">湯意</span>');
       if (o.isDing) name = name.replace('丁','<span class="red">丁</span>');
       if (o.isSetMeal) {name += ' <span class="blue">餐</span>';}
-
-
 
       const modsHtml = o.mods.length
         ? `<small style="color:#666;">${o.mods.map(escapeHtml).join(', ')}</small>`
