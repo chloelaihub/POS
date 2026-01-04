@@ -88,6 +88,7 @@
         <!-- Card, Cash, Add, Unpaid pay buttons -->
        <div class="order-footer">
         <div class="pay-buttons">
+         <button class="pay-btn" id="payment-btn" type="button">Payment</button>
          <button class="pay-btn" id="card-btn" type="button">Card</button>
          <button class="pay-btn pay-cash" id="pay-btn" type="button">Cash</button>
          <button class="pay-btn" id="platform-btn" type="button">Add</button>
@@ -97,6 +98,26 @@
     </div>
   </div>
  </div>
+
+ <!-- 🔍 Order review popup (for cashier to read items) -->
+<div id="review-modal" style="display:none;">
+  <div class="review-box">
+    <div class="review-head">
+      <span>Order review / 確認認單</span>
+      <!-- ✖ close button -->
+      <button type="button" id="review-close" class="review-close">&times;</button>
+    </div>
+
+    <!-- 💳 NEW: Cash + Card controls inside popup -->
+    <div class="review-pay-buttons">
+      <button type="button" id="review-card-btn" class="pay-btn review-btn-card">Card</button>
+      <button type="button" id="review-cash-btn" class="pay-btn review-btn-cash">Cash</button>
+    </div>
+
+    <div id="review-body" class="review-body"></div>
+
+  </div>
+</div>
 
   <!-- Kitchen view (for food items) -->
   <div id="kitchen-view" style="display:none;">
@@ -121,7 +142,6 @@
   <div id="customer-screen" class="customer-screen"></div>
 </div>
 
-<!-- Waitlist view -->
 <!-- Waitlist view -->
 <div id="waitlist-view" style="display:none;">
   <div class="wl-page">
@@ -394,7 +414,7 @@ const menu = [
   { name:"凍咸檸七", price:3.5, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"好立克", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
   { name:"阿華田", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
-  { name:"柚子薑蜜", price:3.0, cat:"飲品", optionGroups:[,"citron-opts"], hotCold:true },
+  { name:"柚子薑蜜", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","citron-opts"], hotCold:true },
   { name:"凍檸樂", price:2.5, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"咖啡", price:2.0, cat:"飲品", optionGroups:["hot-cold-opts","coffee-opts"], hotCold:true },
   { name:"Coke", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
@@ -414,6 +434,7 @@ const menu = [
   { name:"炒蛋多士", price:2.0, cat:"Others", optionGroups:[], hotCold:false },
   { name:"生雲吞",    price:10.0, cat:"Others", optionGroups:[], hotCold:false },
   { name:"套餐 -£0.5", price:-0.5, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"BB通粉", price:0.0, cat:"Others", optionGroups:[], hotCold:false },
 ];
 
 let order = [];
@@ -761,13 +782,17 @@ function initTableButtons() {
     });
   });
 
-  // ⭐ tie enable/disable to service type (堂食 vs others)
+  // ⭐ Enable table buttons for dine-in AND takeaway
   if (typeof orderTypeSelect !== 'undefined' && orderTypeSelect) {
     const applyMode = () => {
-      if (orderTypeSelect.value === 'dine-in') {
+      const type = orderTypeSelect.value;
+
+      if (type === 'dine-in' || type === 'takeaway') {
+        // ✔ allow selecting table
         setTableButtonsEnabled(true);
       } else {
-        setTableButtonsEnabled(false); // greys out + clears value
+        // ❌ disable + clear table selection for other service types
+        setTableButtonsEnabled(false);
       }
     };
 
@@ -1193,9 +1218,90 @@ const cardBtn = document.getElementById('card-btn');
 const platformBtn = document.getElementById('platform-btn');
 const orderTypeSelect = document.getElementById('order-type');
 
+// 💡 NEW: references for the Payment review popup
+const paymentBtn   = document.getElementById('payment-btn');   // your new button
+const reviewModal  = document.getElementById('review-modal');  // overlay
+const reviewBody   = document.getElementById('review-body');   // content area
+const reviewClose  = document.getElementById('review-close');  // close button
+
+// ==============================
+// 🧾 Payment "Review" popup
+// ==============================
+if (paymentBtn && reviewModal && reviewBody) {
+  paymentBtn.addEventListener('click', () => {
+    // 1) no order? nothing to review
+    if (!order.length) {
+      alert('No items in the order.');
+      return;
+    }
+
+    // 2️⃣ Enforce table number for Dine-in / Takeaway
+    //    If this returns false, we STOP and do not open the payment popup
+    if (!ensureTableSelectedIfNeeded()) {
+      return;
+    }
+
+    // 2) Make sure the customer summary is up-to-date
+    //    (this uses your existing renderCustomerView logic)
+    renderCustomerView();
+
+    // 3) Copy the current customer view HTML into the popup body
+    const customerWrap = document.getElementById('customer-screen');
+    if (customerWrap) {
+      // We only copy the INSIDE of #customer-screen,
+      // so we don't duplicate the id in the DOM.
+      reviewBody.innerHTML = customerWrap.innerHTML;
+    }
+
+    // 4) Show the popup
+    reviewModal.style.display = 'flex';
+  });
+}
+
+// Close button (✖)
+if (reviewClose && reviewModal) {
+  reviewClose.addEventListener('click', () => {
+    reviewModal.style.display = 'none';
+  });
+}
+
+// Also close if cashier clicks the dark background
+if (reviewModal) {
+  reviewModal.addEventListener('click', (e) => {
+    // Only close if they clicked the backdrop, not the box itself
+    if (e.target === reviewModal) {
+      reviewModal.style.display = 'none';
+    }
+  });
+}
+
 function isPlatformOrder() {
   const v = orderTypeSelect ? orderTypeSelect.value : '';
   return v === 'deliveroo' || v === 'justeat';
+}
+
+// ✅ Helper: check if table number is required and selected
+function ensureTableSelectedIfNeeded() {
+  // Get current service type (dine-in / takeaway / phone / etc.)
+  const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
+
+  // Only enforce table for Dine-in and Takeaway
+  if (serviceType !== 'dine-in') {
+    return true; // no need to check table, allow to continue
+  }
+
+  // Read the table number input
+  const tableInput = document.getElementById('order-number');
+  const rawTable   = tableInput ? tableInput.value.trim() : '';
+
+  // If empty → show alert and stop
+  if (!rawTable) {
+    alert('請選擇枱號.');
+    return false;
+  }
+
+  // Table is filled → OK to continue
+  return true;
 }
 
 function syncPayButtonsByType() {
@@ -1505,7 +1611,7 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
   // ⛔ Require table for dine-in orders
   if (serviceType === 'dine-in' && !rawTable) {
     alert('請選擇枱號.');
-    return;
+    return;   // ❗ stop here – do NOT send order to kitchen/bar/all-orders
   }
 
   // ⛔ NEW RULE: Deliveroo / JustEat / Phone must have pickup time
@@ -2053,6 +2159,34 @@ function getTicketClass(orderObj) {
     </div>
   `;
   }
+
+  // 🔗 get references to the popup buttons
+const reviewCardBtn = document.getElementById('review-card-btn');
+const reviewCashBtn = document.getElementById('review-cash-btn');
+
+// 💳 CARD button inside popup
+if (reviewCardBtn) {
+  reviewCardBtn.addEventListener('click', () => {
+
+    // 1️⃣ Close the review popup
+    reviewModal.style.display = 'none';
+
+    // 2️⃣ Trigger your existing Card flow
+    cardBtn.click();
+  });
+}
+
+// 💵 CASH button inside popup
+if (reviewCashBtn) {
+  reviewCashBtn.addEventListener('click', () => {
+
+    // 1️⃣ Close the review popup
+    reviewModal.style.display = 'none';
+
+    // 2️⃣ Trigger your existing Cash flow
+    payBtn.click();
+  });
+}
 
   // Active (still in kitchenOrders)
   // 🔁 Show newest first by reversing a copy of the array
@@ -2737,57 +2871,168 @@ async function payExistingTicket(method, overrideTotal = null) {
 }
 
 function renderCustomerView() {
+  // 🔹 1. Find the customer screen wrapper
   const wrap = document.getElementById('customer-screen');
-  if (!wrap) return;
+  if (!wrap) return; // if the element isn't on this page, do nothing
 
+  // 🔹 2. Read current POS state for meta info + totals
   const orderNumberInput = document.getElementById('order-number');
   const pickupInput = document.getElementById('pickup-time');
-  const subtotal = order.length ? lastSubtotal : 0;
-  const baseTotal = order.length ? lastBaseTotal : 0;     // after combo discount
-  const finalTotal = order.length ? lastFinalTotal : 0;   // after cash discount (if cash)
 
+  // These values are set by updateOrder()
+  const subtotal   = order.length ? lastSubtotal   : 0;
+  const baseTotal  = order.length ? lastBaseTotal  : 0; // after combo discount
+  const finalTotal = order.length ? lastFinalTotal : 0; // after cash discount (if cash)
+
+  // Combo discount values for display
   const comboAValue = order.length ? (lastComboACount * 0.5) : 0;
   const comboBValue = order.length ? (lastComboBCount * 1.0) : 0;
 
+  // Total discount values (may be handy later)
   const comboDiscountTotal = order.length ? lastMealDealDiscount : 0;
-  const cashDiscountValue = (order.length && isCash) ? lastCashDiscount : 0;
+  const cashDiscountValue  = (order.length && isCash) ? lastCashDiscount : 0;
 
+  // Service type + table/number + pickup time
   const serviceType = orderTypeSelect ? orderTypeSelect.value : '';
   const tableOrNo   = orderNumberInput ? orderNumberInput.value.trim() : '';
 
   let pickup = pickupInput ? pickupInput.value.trim() : '';
-  if (pickup.length >= 5) pickup = pickup.slice(0,5);
+  // limit pickup display to first 5 characters (e.g. "18:30")
+  if (pickup.length >= 5) pickup = pickup.slice(0, 5);
 
+  // Map service type → label shown to customer
   const typeLabel =
-    serviceType === 'dine-in'  ? '堂食' :
-    serviceType === 'takeaway'   ? '現場外賣' :
-    serviceType === 'phone'      ? '電話外賣' :
-    serviceType === 'deliveroo'? 'Deliveroo' :
-    serviceType === 'justeat'  ? 'Just Eat' :
+    serviceType === 'dine-in'   ? '堂食' :
+    serviceType === 'takeaway'  ? '現場外賣' :
+    serviceType === 'phone'     ? '電話外賣' :
+    serviceType === 'deliveroo' ? 'Deliveroo' :
+    serviceType === 'justeat'   ? 'Just Eat' :
     serviceType || '';
 
+  // 🔹 3. Build the meta “pills” at the top (type, table, pickup)
   const meta = [];
   if (typeLabel) meta.push(`Type: ${typeLabel}`);
   if (tableOrNo) meta.push(`Table/Order: ${tableOrNo}`);
-  if (pickup) meta.push(`Pickup: ${pickup}`);
+  if (pickup)    meta.push(`Pickup: ${pickup}`);
 
-  const itemsHtml = order.length
-    ? order.map(it => {
-        const mods = Array.isArray(it.mods) && it.mods.length
-          ? `<div class="customer-mods">${it.mods.map(m => escapeHtml(m)).join(', ')}</div>`
-          : '';
-        return `
-          <div class="customer-item">
-            <div>
-              <div><strong>${escapeHtml(it.displayName)}</strong></div>
-              ${mods}
-            </div>
-            <div>£${Number(it.final).toFixed(2)}</div>
-          </div>
-        `;
-      }).join('')
-    : `<div style="color:#777;">No items yet</div>`;
+  // 🔹 4. If there is NO order, show a simple empty state and exit early
+  if (!order.length) {
+    wrap.innerHTML = `
+      <div class="customer-title">請查看你的訂單 Here is your order</div>
+      <div class="customer-meta">
+        ${meta.map(x => `<span class="customer-pill">${escapeHtml(x)}</span>`).join('')}
+      </div>
+      <div class="customer-card">
+        <div style="color:#777;">No items yet</div>
+      </div>
+    `;
+    return;
+  }
 
+  // =========================
+  // 🔹 5. Sort items by category + name
+  // =========================
+
+  // Desired order:
+  // Food (咖喱系列, 茶記粉面, 主食) → Drinks (飲品) → Snacks (小食) → Others
+  const categoryOrder = [
+    '咖喱系列',   // Curry series
+    '茶記粉面',   // Noodles
+    '主食',       // Main dishes
+    '飲品',       // Drinks
+    '小食',       // Snacks
+    'Others'      // Everything else
+  ];
+
+  // Make a sorted copy of the current order
+  const sortedOrder = [...order].sort((a, b) => {
+    // 1) Compare by category order
+    const ia = categoryOrder.indexOf(a.cat);
+    const ib = categoryOrder.indexOf(b.cat);
+
+    // Category not in the list → send to the end (index = 999)
+    const sa = ia === -1 ? 999 : ia;
+    const sb = ib === -1 ? 999 : ib;
+
+    if (sa !== sb) {
+      return sa - sb; // different category → category wins
+    }
+
+    // 2) If same category, sort by item name (Chinese + English friendly)
+    const nameA = (a.displayName || a.name || '').toString();
+    const nameB = (b.displayName || b.name || '').toString();
+
+    return nameA.localeCompare(nameB, 'zh-HK');
+    /**
+     * 🧠 localeCompare():
+     * - sorts Chinese correctly
+     * - also works for English text
+     */
+  });
+
+  // =========================
+  // 🔹 6. Group identical items
+  //    (same category + name + modifiers)
+  //    This is ONLY for this customer/payment view.
+  //    Kitchen / bar still get every single line as before.
+  // =========================
+  const grouped = [];
+  const groupMap = new Map(); // key → group object
+
+  sortedOrder.forEach(it => {
+    const name      = it.displayName || it.name || '';
+    const modsArray = Array.isArray(it.mods) ? it.mods : [];
+
+    // Use modifiers in the key so “少冰” and “走冰” still show as separate rows
+    const modsKey = modsArray.join('|');
+    const key     = `${it.cat}::${name}::${modsKey}`;
+
+    let g = groupMap.get(key);
+
+    // If this combo hasn’t been seen yet, create a new group
+    if (!g) {
+      g = {
+        cat: it.cat,      // category (for info / future use)
+        name,             // display name
+        mods: modsArray,  // same modifiers for the whole group
+        count: 0,         // how many of this item
+        total: 0          // total price for this group
+      };
+      groupMap.set(key, g);
+      grouped.push(g);    // preserve order from sortedOrder
+    }
+
+    // Add this line to the group
+    g.count += 1;
+    g.total += Number(it.final ?? it.price ?? 0) || 0;
+  });
+
+  // =========================
+  // 🔹 7. Build HTML for grouped items
+  // =========================
+  const itemsHtml = grouped.map(g => {
+    // Optional modifiers line (e.g. 少冰, 走冰)
+    const modsHtml = g.mods.length
+      ? `<div class="customer-mods">${g.mods.map(m => escapeHtml(m)).join(', ')}</div>`
+      : '';
+
+    // Only show “xN” if quantity > 1
+    const qtyLabel = g.count > 1 ? ` x${g.count}` : '';
+
+    return `
+      <div class="customer-item">
+        <div>
+          <div><strong>${escapeHtml(g.name)}${qtyLabel}</strong></div>
+          ${modsHtml}
+        </div>
+        <div>£${g.total.toFixed(2)}</div>
+      </div>
+    `;
+  }).join('');
+
+  // =========================
+  // 🔹 8. Drop everything into the customer screen
+  // =========================
   wrap.innerHTML = `
     <div class="customer-title">請查看你的訂單 Here is your order</div>
     <div class="customer-meta">
@@ -2795,35 +3040,36 @@ function renderCustomerView() {
     </div>
     <div class="customer-card">
       ${itemsHtml}
+
       <div class="customer-total">
-  <div>Base total</div>
-  <div>£${baseTotal.toFixed(2)}</div>
-</div>
+        <div>Base total</div>
+        <div>£${baseTotal.toFixed(2)}</div>
+      </div>
 
-${comboAValue > 0 ? `
-<div class="customer-total" style="color:#d32f2f;">
-  <div>Combo A x${lastComboACount}</div>
-  <div>-£${comboAValue.toFixed(2)}</div>
-</div>` : ''}
+      ${comboAValue > 0 ? `
+      <div class="customer-total" style="color:#d32f2f;">
+        <div>Combo A x${lastComboACount}</div>
+        <div>-£${comboAValue.toFixed(2)}</div>
+      </div>` : ''}
 
-${comboBValue > 0 ? `
-<div class="customer-total" style="color:#d32f2f;">
-  <div>Combo B x${lastComboBCount}</div>
-  <div>-£${comboBValue.toFixed(2)}</div>
-</div>` : ''}
+      ${comboBValue > 0 ? `
+      <div class="customer-total" style="color:#d32f2f;">
+        <div>Combo B x${lastComboBCount}</div>
+        <div>-£${comboBValue.toFixed(2)}</div>
+      </div>` : ''}
 
-${cashDiscountValue > 0 ? `
-<div class="customer-total" style="color:#d32f2f;">
-  <div>Cash 5%</div>
-  <div>-£${cashDiscountValue.toFixed(2)}</div>
-</div>` : ''}
+      ${cashDiscountValue > 0 ? `
+      <div class="customer-total" style="color:#d32f2f;">
+        <div>Cash 5%</div>
+        <div>-£${cashDiscountValue.toFixed(2)}</div>
+      </div>` : ''}
 
-<hr style="margin:10px 0;">
+      <hr style="margin:10px 0;">
 
-<div class="customer-total" style="font-size:26px;">
-  <div>Total</div>
-  <div>£${finalTotal.toFixed(2)}</div>
-</div>
+      <div class="customer-total" style="font-size:26px;">
+        <div>Total</div>
+        <div>£${finalTotal.toFixed(2)}</div>
+      </div>
     </div>
   `;
 }

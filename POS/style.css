@@ -61,7 +61,7 @@ body{
   .left{
     flex:1;
     overflow-y:auto;        /* menu scrolls */
-    padding:20px;
+    padding:14px;
     background:#f0f2f5;
     min-height:0;          /* 👈 inside flex row */
   }
@@ -97,19 +97,19 @@ body{
   }
 
   .category h2{
-    margin-bottom:10px;
+    margin-bottom:2px;
     font-size:1.0em;
   }
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 14px;
+  gap: 6x;
 }
 
 .curry-group {
   display: grid;
   grid-template-columns: repeat(3, minmax(260px, 1fr));
-  gap: 14px; /* match your normal spacing */
+  gap: 14px;
 }
 
 .item {
@@ -1106,6 +1106,90 @@ body{
 .wl-table td:nth-child(4),
 .wl-table th:nth-child(4){
   text-align: center;   /* Wait time aligned */
+}
+
+/* ===== Order review popup (Payment button) ===== */
+
+#review-modal {
+  position: fixed;
+  inset: 0;                          /* top:0; right:0; bottom:0; left:0 */
+  background: rgba(0, 0, 0, 0.8);    /* dark backdrop */
+  display: none;                     /* hidden by default */
+  align-items: center;
+  justify-content: center;
+  z-index: 120;                      /* above pay-modal (110) */
+}
+
+.review-box {
+  background: #fff;
+  border-radius: 22px;
+  width: 95%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;                  /* scroll if there are many items */
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.4em;
+  font-weight: 700;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+}
+
+.review-close {
+  border: none;
+  background: none;
+  font-size: 1.6em;
+  cursor: pointer;
+}
+
+/* Make the contents larger for reading out loud */
+.review-body {
+  font-size: 1.2em;
+}
+
+/* Optional: if you want the customer-style layout even bigger in the popup */
+.review-body .customer-title {
+  font-size: 30px;
+}
+
+.review-body .customer-item {
+  font-size: 1.1em;
+}
+
+/* ===== Payment buttons INSIDE popup ===== */
+
+.review-pay-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* Match your POS button style but smaller */
+.review-pay-buttons .pay-btn {
+  padding: 10px 14px;
+  font-size: 1.0em;
+  border-radius: 14px;
+  font-weight: bold;
+}
+
+/* Style match your existing ones */
+.review-btn-card {
+  background: #e9ecef;
+  color: #333;
+  border: none;
+}
+
+.review-btn-cash {
+  background: var(--green);
+  color: white;
+  border: none;
 }
 
 .admin-item-sales-grid{
