@@ -103,13 +103,13 @@ body{
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 6x;
+  gap: 10x;
 }
 
 .curry-group {
   display: grid;
   grid-template-columns: repeat(3, minmax(260px, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .item {
@@ -1181,14 +1181,14 @@ body{
 
 /* Style match your existing ones */
 .review-btn-card {
-  background: #e9ecef;
-  color: #333;
+  background: #c99500;
+  color: #000000;
   border: none;
 }
 
 .review-btn-cash {
-  background: var(--green);
-  color: white;
+  background: #c99500;
+  color: #000000;
   border: none;
 }
 
@@ -1303,6 +1303,66 @@ body{
   font-size: 20px;
   margin-top: 4px;
   opacity: 0.8;
+}
+
+/* dark overlay */
+#card-pending-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: none;              /* JS will switch to flex */
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* white box */
+.card-pending-box {
+  background: #fff;
+  padding: 16px;
+  width: 360px;
+  max-width: 90%;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+/* title row */
+.card-pending-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: bold;
+}
+
+/* X button */
+.card-pending-close {
+  border: none;
+  background: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+/* main body text */
+.card-pending-body {
+  margin-bottom: 16px;
+}
+
+/* total amount */
+.card-pending-amount {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+/* full-width confirm button */
+.card-pending-confirm {
+  width: 100%;
+}
+
+button:disabled {
+  opacity: 0.4;         /* greyed out look */
+  cursor: not-allowed;  /* visual hint */
+  pointer-events: none; /* prevent any clicks */
 }
 
 /* Responsive: tablet portrait */

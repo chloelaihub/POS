@@ -89,8 +89,6 @@
        <div class="order-footer">
         <div class="pay-buttons">
          <button class="pay-btn" id="payment-btn" type="button">Payment</button>
-         <button class="pay-btn" id="card-btn" type="button">Card</button>
-         <button class="pay-btn pay-cash" id="pay-btn" type="button">Cash</button>
          <button class="pay-btn" id="platform-btn" type="button">Add</button>
          <button class="pay-btn" id="unpaid-btn" type="button">Unpaid</button>
        </div>
@@ -103,7 +101,7 @@
 <div id="review-modal" style="display:none;">
   <div class="review-box">
     <div class="review-head">
-      <span>Order review / 確認認單</span>
+      <span>確認訂單</span>
       <!-- ✖ close button -->
       <button type="button" id="review-close" class="review-close">&times;</button>
     </div>
@@ -116,6 +114,33 @@
 
     <div id="review-body" class="review-body"></div>
 
+  </div>
+</div>
+
+<!-- 💳 Card Pending Payment Popup -->
+<div id="card-pending-modal" style="display:none;">
+  <div class="card-pending-box">
+    <div class="card-pending-head">
+      <span>...</span>
+      <!-- small X on the top-right -->
+      <button type="button" id="card-pending-close" class="card-pending-close">&times;</button>
+    </div>
+
+    <div class="card-pending-body">
+      <p>等候卡機付款</p>
+      <p class="card-pending-amount">
+        Total: <span id="card-pending-total"></span>
+      </p>
+    </div>
+
+    <!-- Big confirm button at the bottom -->
+    <button
+      type="button"
+      id="card-pending-confirm"
+      class="pay-btn card-pending-confirm"
+    >
+      Confirm payment received
+    </button>
   </div>
 </div>
 
@@ -397,30 +422,30 @@ const menu = [
   { name:"五香肉丁", price:8.4, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "五香肉丁", SoupVermicelliName:"五香肉丁湯米", SoupMacaroniName:"五香肉丁湯通", SoupSpaghettiName:"五香肉丁湯意", SoupMeinName:"五香肉丁湯粗", SoupRamenName:"五香肉丁湯拉麵" },
   { name:"火腿", price:7.9, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "火腿丁", SoupVermicelliName:"火腿湯米", SoupMacaroniName:"火腿湯通", SoupSpaghettiName:"火腿湯意", SoupMeinName:"火腿湯粗", SoupRamenName:"火腿湯拉麵" },
 
-  { name:"柱侯牛腩飯", price:11.8, cat:"主食", optionGroups:["brisket-opts"], hotCold:false, loMeinName:"柱侯牛筋腩撈粗", loRamenName:"柱侯牛腩撈拉麵", loDingName:"柱侯牛腩撈丁", SoupMeinName:"柱侯牛筋腩湯粗", SoupRamenName:"柱侯牛筋腩湯拉麵", SoupDingName:"柱侯牛筋腩湯丁"},
-  { name:"蜜汁叉燒煎蛋飯", price:11.5, cat:"主食", optionGroups:["charsiu-opts"], hotCold:false, loMeinName:"蜜汁叉燒煎蛋撈粗" },
   { name:"鮮茄焗豬扒飯", price:12.5, cat:"主食", optionGroups:["tomato-baked-opts"], hotCold:false },
   { name:"葡汁焗雞扒飯", price:12.5, cat:"主食", optionGroups:["portuguese-opts"], hotCold:false },
   { name:"蔥油雞扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"蔥油雞扒煎蛋撈粗", loRamenName:"蔥油雞扒煎蛋撈拉麵", loDingName:"蔥油雞扒煎蛋撈丁", SoupVermicelliName:"蔥油雞扒煎蛋湯米", SoupMacaroniName:"蔥油雞扒煎蛋湯通", SoupSpaghettiName:"蔥油雞扒煎蛋湯意" },
   { name:"蔥油豬扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"蔥油豬扒煎蛋撈粗", loRamenName:"蔥油豬扒煎蛋撈拉麵", loDingName:"蔥油豬扒煎蛋撈丁", SoupVermicelliName:"蔥油豬扒煎蛋湯米", SoupMacaroniName:"蔥油豬扒煎蛋湯通", SoupSpaghettiName:"蔥油豬扒煎蛋湯意"  },
+  { name:"牛筋腩飯", price:11.8, cat:"主食", optionGroups:["brisket-opts"], hotCold:false, loMeinName:"牛筋腩撈粗", loRamenName:"牛腩撈拉麵", loDingName:"牛腩撈丁", SoupMeinName:"牛筋腩湯粗", SoupRamenName:"牛筋腩湯拉麵", SoupDingName:"牛筋腩湯丁"},
+  { name:"叉燒煎蛋飯", price:11.5, cat:"主食", optionGroups:["charsiu-opts"], hotCold:false, loMeinName:"叉燒煎蛋撈粗" },
   { name:"泡菜五花腩飯", price:11.5, cat:"主食", optionGroups:["kimchi-opts"], hotCold:false },
   { name:"滑蛋鰻魚飯", price:13.5, cat:"主食", optionGroups:["basic-rice-opts"], hotCold:false },
 
   // 飲品
   { name:"奶茶", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","milktea-opts"], hotCold:true },
-  { name:"粒粒椰汁紅豆冰", price:4.0, cat:"飲品", optionGroups:["redbean-opts"], hotCold:false },
   { name:"檸茶", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts", "lemon-opts"], hotCold:true },
   { name:"檸水", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts"], hotCold:true },
-  { name:"凍咸檸七", price:3.5, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"粒粒椰汁紅豆冰", price:4.0, cat:"飲品", optionGroups:["redbean-opts"], hotCold:false },
   { name:"好立克", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
   { name:"阿華田", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
   { name:"柚子薑蜜", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","citron-opts"], hotCold:true },
-  { name:"凍檸樂", price:2.5, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"咖啡", price:2.0, cat:"飲品", optionGroups:["hot-cold-opts","coffee-opts"], hotCold:true },
+  { name:"鴛鴦", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","yuenyeung-opts"], hotCold:true },
+  { name:"凍檸樂", price:2.5, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"凍咸檸七", price:3.5, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"Coke", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"Zero", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"7up", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
-  { name:"鴛鴦", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","yuenyeung-opts"], hotCold:true },
   { name:"紅茶", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
 
   // 小食
@@ -920,6 +945,9 @@ function updateOrder() {
 
   // ✅ keep Customer screen in sync
   renderCustomerView();
+
+  // ⭐ ALWAYS sync button states after recalculating the order
+   updatePaymentButtonsState();
 }
 
 document.getElementById('add').addEventListener('click', () => {
@@ -1206,6 +1234,13 @@ document.querySelectorAll('.opt').forEach(o => {
   });
 });
 
+// ⭐ Buttons we want to enable/disable based on whether order[] has items
+const paymentBtn       = document.getElementById('payment-btn');
+const payCashBtn       = document.getElementById('review-cash-btn');
+const payCardBtn       = document.getElementById('review-card-btn');
+const unpaidBtn        = document.getElementById('unpaid-btn');
+const platformBtn      = document.getElementById('platform-btn');
+
 const payBtn = document.getElementById('pay-btn');
 const payModal = document.getElementById('pay-modal');
 const amountDueEl = document.getElementById('amount-due');
@@ -1213,29 +1248,31 @@ const amountInput = document.getElementById('amount-received');
 const changeEl = document.getElementById('change-amount');
 const payCancel = document.getElementById('pay-cancel');
 const payConfirm = document.getElementById('pay-confirm');
-const cardBtn = document.getElementById('card-btn');
 
-const platformBtn = document.getElementById('platform-btn');
 const orderTypeSelect = document.getElementById('order-type');
 
-// 💡 NEW: references for the Payment review popup
-const paymentBtn   = document.getElementById('payment-btn');   // your new button
+// 💡 Payment review popup (KEEP these)
 const reviewModal  = document.getElementById('review-modal');  // overlay
 const reviewBody   = document.getElementById('review-body');   // content area
 const reviewClose  = document.getElementById('review-close');  // close button
+
+// 💳 Card + Pending payment popup (NEW)
+const reviewCardBtn = document.getElementById('review-card-btn');      // Card button inside review popup
+const reviewCashBtn = document.getElementById('review-cash-btn');      // Cash button inside review popup
+
+const cardPendingModal   = document.getElementById('card-pending-modal');   // "pending card payment" overlay
+const cardPendingTotal   = document.getElementById('card-pending-total');   // span where we show £total
+const cardPendingClose   = document.getElementById('card-pending-close');   // X button
+const cardPendingConfirm = document.getElementById('card-pending-confirm'); // "Confirm payment received" button
+
 
 // ==============================
 // 🧾 Payment "Review" popup
 // ==============================
 if (paymentBtn && reviewModal && reviewBody) {
   paymentBtn.addEventListener('click', () => {
-    // 1) no order? nothing to review
-    if (!order.length) {
-      alert('No items in the order.');
-      return;
-    }
 
-    // 2️⃣ Enforce table number for Dine-in / Takeaway
+    //    Enforce table number for Dine-in / Takeaway
     //    If this returns false, we STOP and do not open the payment popup
     if (!ensureTableSelectedIfNeeded()) {
       return;
@@ -1275,6 +1312,20 @@ if (reviewModal) {
   });
 }
 
+// 💡 Enable or disable payment buttons depending on whether we have items
+function updatePaymentButtonsState() {
+
+  // 🔍 If there is at least ONE item in the order
+  const hasItems = order && order.length > 0;
+
+  // 🟡 Toggle disabled property on ALL relevant buttons
+  if (paymentBtn)  paymentBtn.disabled  = !hasItems;
+  if (payCashBtn)  payCashBtn.disabled  = !hasItems;
+  if (payCardBtn)  payCardBtn.disabled  = !hasItems;
+  if (unpaidBtn)   unpaidBtn.disabled   = !hasItems;
+  if (platformBtn) platformBtn.disabled = !hasItems;
+}
+
 function isPlatformOrder() {
   const v = orderTypeSelect ? orderTypeSelect.value : '';
   return v === 'deliveroo' || v === 'justeat';
@@ -1304,28 +1355,12 @@ function ensureTableSelectedIfNeeded() {
   return true;
 }
 
-function syncPayButtonsByType() {
-  const cardBtn = document.getElementById('card-btn');
-  const cashBtn = document.getElementById('pay-btn'); // your cash button id
-  if (!cardBtn || !cashBtn) return;
-
-  const platform = isPlatformOrder(); // deliveroo / justeat
-
-  cardBtn.disabled = platform;
-  cashBtn.disabled = platform;
-
-  cardBtn.style.opacity = platform ? '0.5' : '1';
-  cashBtn.style.opacity = platform ? '0.5' : '1';
-}
-
 function syncPlatformBtnState() {
   if (!platformBtn) return;
   const on = isPlatformOrder();
   platformBtn.disabled = !on;
   platformBtn.style.opacity = on ? '1' : '0.5';
 }
-
-const unpaidBtn = document.getElementById('unpaid-btn');
 
 function canUnpaidOrder() {
   const v = orderTypeSelect ? orderTypeSelect.value : '';
@@ -1341,7 +1376,6 @@ function syncUnpaidBtnState() {
 
 // ✅ Initial state (run AFTER unpaidBtn exists)
 syncUnpaidBtnState();
-syncPayButtonsByType();
 syncPlatformBtnState();
 
 // make sure both Add + Unpaid update when type changes
@@ -1349,21 +1383,15 @@ if (orderTypeSelect) {
   orderTypeSelect.addEventListener('change', () => {
     syncPlatformBtnState();
     syncUnpaidBtnState();
-    syncPayButtonsByType();   // ✅ add this
   });
 }
 syncUnpaidBtnState();
 
 // ----------------------
-// Cash pay button (opens popup)
+// Reusable: open the Cash popup
 // ----------------------
-payBtn.addEventListener('click', () => {
-  if (!order.length) {
-    alert('No items in the order.');
-    return;
-  }
-
-  // ⭐ NEW: enforce table number for dine-in BEFORE opening cash popup
+function openCashPopup() {
+  // ⭐ Enforce table number for dine-in BEFORE opening cash popup
   const tableInput  = document.getElementById('order-number');
   const rawTable    = tableInput ? tableInput.value.trim() : '';
   const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
@@ -1380,19 +1408,32 @@ payBtn.addEventListener('click', () => {
   const cashBtnEl = document.getElementById('cash-btn');
   if (cashBtnEl) cashBtnEl.classList.add('active');
 
-  updateOrder(); // so “Cash 5%: -£x.xx” shows before popup
-  renderCustomerView();
+  updateOrder();        // so “Cash 5%: -£x.xx” shows before popup
+  renderCustomerView(); // keep customer view in sync
 
   // cash total shown with 1 decimal
-  amountDueEl.textContent = '£' + lastFinalTotal.toFixed(1);
+  if (amountDueEl) {
+    amountDueEl.textContent = '£' + lastFinalTotal.toFixed(1);
+  }
 
-  amountInput.value = '';
-  changeEl.textContent = '£0.00';
-  changeEl.parentElement.classList.remove('negative');
+  if (amountInput && changeEl) {
+    amountInput.value = '';
+    changeEl.textContent = '£0.00';
+    changeEl.parentElement.classList.remove('negative');
+  }
 
-  payModal.style.display = 'flex';
-  amountInput.focus();
-});
+  if (payModal) {
+    payModal.style.display = 'flex';
+  }
+  if (amountInput) {
+    amountInput.focus();
+  }
+}
+
+// (Optional) only if you *keep* the old header cash button in future
+if (payBtn) {
+  payBtn.addEventListener('click', openCashPopup);
+}
 
 // live change calculation for cash popup
 amountInput.addEventListener('input', () => {
@@ -1571,18 +1612,19 @@ async function saveTicketItemsToSupabase(orderObj) {
   }
 }
 
-// ----------------------
-// Shared finalise logic (cash + card)
-// ----------------------
+// 🧾 Finalise an order (card / cash / platform)
 function finalizeOrder(paymentMethod, overrideTotal = null) {
-  // If we are paying an existing Unpaid ticket, do NOT create a new kitchen ticket
-  if (payingOrderId) {
-    payExistingTicket(paymentMethod, overrideTotal);
+  // 🚧 SAFETY NET:
+  // If there's no current order AND we're not paying an existing unpaid ticket,
+  // do *nothing*. This prevents empty Supabase rows if something double-calls us.
+  if (!order.length && !payingOrderId) {
+    console.warn('[finalizeOrder] called with empty order – ignored');
     return;
   }
 
-  if (!order.length) {
-    alert('No items in the order.');
+  // If we are paying an existing Unpaid ticket, do NOT create a new kitchen ticket
+  if (payingOrderId) {
+    payExistingTicket(paymentMethod, overrideTotal);
     return;
   }
 
@@ -1607,12 +1649,6 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
 
   // 🔎 read pickup time (could be empty string)
   const pickupTime = pickupInput ? pickupInput.value.trim() : '';
-
-  // ⛔ Require table for dine-in orders
-  if (serviceType === 'dine-in' && !rawTable) {
-    alert('請選擇枱號.');
-    return;   // ❗ stop here – do NOT send order to kitchen/bar/all-orders
-  }
 
   // ⛔ NEW RULE: Deliveroo / JustEat / Phone must have pickup time
   if (
@@ -1731,33 +1767,12 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
   if (adminUnlocked) renderAdminView();
 }
 
-// ----------------------
-// Card button (NO popup) – just finalise immediately
-// ----------------------
-if (cardBtn) {
-  cardBtn.addEventListener('click', () => {
-    // allow paying an existing unpaid ticket even if POS draft is empty
-    if (!order.length && !payingOrderId) {
-      alert('No items in the order.');
-      return;
-    }
-
-    isCash = false;
-    updateOrder();
-    finalizeOrder('card');
-  });
-}
-
 if (unpaidBtn) {
   unpaidBtn.addEventListener('click', createUnpaidTicketFromCurrentOrder);
 }
 
 if (platformBtn) {
   platformBtn.addEventListener('click', () => {
-    if (!order.length) {
-      alert('No items in the order.');
-      return;
-    }
 
     if (!isPlatformOrder()) {
       alert('This button is only for Deliveroo / Just Eat orders.');
@@ -1937,9 +1952,11 @@ const ticketClass =
         </div>
         <div class="ticket-body">
           ${
-           orderObj.foodItems
-             .map((item, idx) => renderTicketItemLine(item, orderObj.id, idx, 'food'))
-             .join('')
+             // 🔁 sort food items by category then name
+            [...orderObj.foodItems]
+               .sort(compareItemsByCategoryThenName)
+               .map((item, idx) => renderTicketItemLine(item, orderObj.id, idx, 'food'))
+               .join('')
            }
          </div>
        </div>
@@ -1994,10 +2011,12 @@ const ticketClass =
         </div>
         <div class="ticket-body">
           ${
-            orderObj.drinkItems
-             .map((item, idx) => renderTicketItemLine(item, orderObj.id, idx, 'drink'))
-             .join('')
-           }
+            // 🔁 sort drinks by category (they’ll all be "drink") then name
+            [...orderObj.drinkItems]
+              .sort(compareItemsByCategoryThenName)
+              .map((item, idx) => renderTicketItemLine(item, orderObj.id, idx, 'drink'))
+              .join('')
+          }
         </div>
        </div>
     `;
@@ -2058,8 +2077,13 @@ function getTicketClass(orderObj) {
         ? `<button type="button" class="pay-pending-btn" data-order-id="${orderObj.id}">Pay</button>`
         : '';
 
+      // ⭐ NEW: sort combined items by category then name
+      allItems.sort((a, b) => {
+        return compareItemsByCategoryThenName(a.item, b.item);
+      });
+
       const itemsHtml = allItems.map(entry => {
-        const it   = entry.item;
+      const it   = entry.item;
       const kind = entry.kind;
       const idx  = entry.index;
 
@@ -2160,31 +2184,95 @@ function getTicketClass(orderObj) {
   `;
   }
 
-  // 🔗 get references to the popup buttons
-const reviewCardBtn = document.getElementById('review-card-btn');
-const reviewCashBtn = document.getElementById('review-cash-btn');
-
-// 💳 CARD button inside popup
-if (reviewCardBtn) {
+// Card button inside the review popup
+if (reviewCardBtn && cardPendingModal) {
   reviewCardBtn.addEventListener('click', () => {
 
-    // 1️⃣ Close the review popup
-    reviewModal.style.display = 'none';
+    // 💳 Card means NO cash discount
+    isCash = false;
 
-    // 2️⃣ Trigger your existing Card flow
-    cardBtn.click();
+    // 🔄 Recalculate totals
+    updateOrder();
+    renderCustomerView();
+
+    // SHOW TOTAL IN THE POPUP
+    const totalEl = document.getElementById('card-pending-total');
+
+    if (totalEl) {
+      // lastFinalTotal already includes discounts / VAT logic
+      totalEl.textContent = '£' + Number(lastFinalTotal).toFixed(2);
+    }
+
+    // Show the "pending for payment" popup
+    cardPendingModal.style.display = 'flex';
+
+    // Optionally hide the review popup behind it
+    if (reviewModal) {
+      reviewModal.style.display = 'none';
+    }
   });
 }
+
+// 💳 Close button (X) for card pending popup
+if (cardPendingClose && cardPendingModal) {
+  cardPendingClose.addEventListener('click', () => {
+    cardPendingModal.style.display = 'none';
+  });
+}
+
+// Also close if cashier clicks the dark background
+if (cardPendingModal) {
+  cardPendingModal.addEventListener('click', (e) => {
+    if (e.target === cardPendingModal) {
+      cardPendingModal.style.display = 'none';
+    }
+  });
+}
+
+// ✅ Confirm button: card payment finished on terminal
+  if (cardPendingConfirm) {
+    cardPendingConfirm.addEventListener('click', () => {
+      // Close the pending popup
+      if (cardPendingModal) {
+        cardPendingModal.style.display = 'none';
+      }
+
+      // Just in case the review popup is still around, hide it too
+      if (reviewModal) {
+        reviewModal.style.display = 'none';
+      }
+
+      // ✅ Now actually finalise the order as "card"
+      //    finalizeOrder() now does all safety checks:
+      //    - no items + no unpaid ticket → alert once
+      //    - payingOrderId set → payExistingTicket(...)
+      //    - otherwise → create new ticket and send to kitchen/bar/etc.
+      finalizeOrder('card');
+    });
+
+  if (cardPendingClose && cardPendingModal) {
+    cardPendingClose.addEventListener('click', () => {
+      cardPendingModal.style.display = 'none';
+
+      // Optional: return to the review popup so they can choose Cash or edit items
+      if (reviewModal) {
+        reviewModal.style.display = 'flex';
+      }
+    });
+  }
+  }
 
 // 💵 CASH button inside popup
 if (reviewCashBtn) {
   reviewCashBtn.addEventListener('click', () => {
 
     // 1️⃣ Close the review popup
-    reviewModal.style.display = 'none';
+    if (reviewModal) {
+      reviewModal.style.display = 'none';
+    }
 
-    // 2️⃣ Trigger your existing Cash flow
-    payBtn.click();
+    // 2️⃣ Open the cash popup using the shared function
+    openCashPopup();
   });
 }
 
@@ -2207,7 +2295,58 @@ function bucketFromCategory(cat) {
   const c = String(cat || '');
   if (c.includes('飲品')) return 'drink';
   if (c.includes('小食')) return 'snack';
+  if (!c) return 'other';
   return 'food';
+}
+
+const BUCKET_SORT_ORDER = {
+  food: 0,
+  drink: 1,
+  snack: 2,
+  other: 3
+};
+
+// Helper: figure out the bucket for a given item object
+function getBucketFromItem(item) {
+  // Kitchen/Bar items use .cat
+  // Admin pivot rows use .category – support both
+  return bucketFromCategory(item.cat || item.category);
+}
+
+// 🔁 Sort items by (1) bucket order, then (2) name
+function compareItemsByCategoryThenName(a, b) {
+  const bucketA = getBucketFromItem(a);
+  const bucketB = getBucketFromItem(b);
+
+  const orderA = BUCKET_SORT_ORDER[bucketA] ?? 99;
+  const orderB = BUCKET_SORT_ORDER[bucketB] ?? 99;
+
+  if (orderA !== orderB) {
+    return orderA - orderB;    // Food → Drinks → Snacks → Others
+  }
+
+  const nameA = String(a.displayName || a.name || '');
+  const nameB = String(b.displayName || b.name || '');
+
+  // Use localeCompare so Chinese/English sort nicely
+  return nameA.localeCompare(nameB, 'zh-HK');
+}
+
+// (keep your existing admin pivot, just add "other" bucket)
+function buildBucketPivot(itemRows) {
+  const buckets = { food: [], drink: [], snack: [], other: [] };
+
+  itemRows.forEach(r => {
+    const b = bucketFromCategory(r.category);
+    buckets[b].push(r);
+  });
+
+  // Sort each bucket by qty desc (admin view logic – unchanged)
+  Object.keys(buckets).forEach(k => {
+    buckets[k].sort((a, b) => b.qty - a.qty);
+  });
+
+  return buckets;
 }
 
 function buildBucketPivot(itemRows) {
@@ -2677,10 +2816,6 @@ if (exportBtn) {
 }
 
 function createUnpaidTicketFromCurrentOrder() {
-  if (!order.length) {
-    alert('No items in the order.');
-    return;
-  }
   if (!canUnpaidOrder()) {
     alert('Unpaid is only for Dine-in / Takeaway / Phone orders.');
     return;
@@ -2912,13 +3047,12 @@ function renderCustomerView() {
   // 🔹 3. Build the meta “pills” at the top (type, table, pickup)
   const meta = [];
   if (typeLabel) meta.push(`Type: ${typeLabel}`);
-  if (tableOrNo) meta.push(`Table/Order: ${tableOrNo}`);
+  if (tableOrNo) meta.push(`Table#: ${tableOrNo}`);
   if (pickup)    meta.push(`Pickup: ${pickup}`);
 
   // 🔹 4. If there is NO order, show a simple empty state and exit early
   if (!order.length) {
     wrap.innerHTML = `
-      <div class="customer-title">請查看你的訂單 Here is your order</div>
       <div class="customer-meta">
         ${meta.map(x => `<span class="customer-pill">${escapeHtml(x)}</span>`).join('')}
       </div>
@@ -3034,7 +3168,6 @@ function renderCustomerView() {
   // 🔹 8. Drop everything into the customer screen
   // =========================
   wrap.innerHTML = `
-    <div class="customer-title">請查看你的訂單 Here is your order</div>
     <div class="customer-meta">
       ${meta.map(x => `<span class="customer-pill">${escapeHtml(x)}</span>`).join('')}
     </div>
