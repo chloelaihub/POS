@@ -1952,13 +1952,20 @@ const ticketClass =
         </div>
         <div class="ticket-body">
           ${
-             // 🔁 sort food items by category then name
-            [...orderObj.foodItems]
-               .sort(compareItemsByCategoryThenName)
-               .map((item, idx) => renderTicketItemLine(item, orderObj.id, idx, 'food'))
-               .join('')
-           }
-         </div>
+            // 1) Attach original index to each item
+            orderObj.foodItems
+              .map((item, originalIndex) => ({ item, originalIndex }))
+
+              // 2) Sort by category + name (using the helper)
+              .sort((a, b) => compareItemsByCategoryThenName(a.item, b.item))
+
+              // 3) Render each line, but pass the ORIGINAL index
+              .map(({ item, originalIndex }) =>
+                renderTicketItemLine(item, orderObj.id, originalIndex, 'food')
+              )
+              .join('')
+          }
+        </div>
        </div>
     `;
   });
@@ -2011,10 +2018,12 @@ const ticketClass =
         </div>
         <div class="ticket-body">
           ${
-            // 🔁 sort drinks by category (they’ll all be "drink") then name
-            [...orderObj.drinkItems]
-              .sort(compareItemsByCategoryThenName)
-              .map((item, idx) => renderTicketItemLine(item, orderObj.id, idx, 'drink'))
+            orderObj.drinkItems
+              .map((item, originalIndex) => ({ item, originalIndex }))
+              .sort((a, b) => compareItemsByCategoryThenName(a.item, b.item))
+              .map(({ item, originalIndex }) =>
+                renderTicketItemLine(item, orderObj.id, originalIndex, 'drink')
+              )
               .join('')
           }
         </div>
@@ -2632,34 +2641,65 @@ document.getElementById('all-orders').addEventListener('click', async e => {
   }  
 
 // ✅ PAY (whole order)
-  const payBtn = e.target.closest('.pay-pending-btn');
-  if (payBtn) {
-    const orderId = Number(payBtn.dataset.orderId);
-    if (!orderId) return;
+const payBtn = e.target.closest('.pay-pending-btn');
+if (payBtn) {
+  const orderId = Number(payBtn.dataset.orderId);
+  if (!orderId) return;
 
-    const ticket = findTicketById(orderId);
-    if (!ticket) return;
+  const ticket = findTicketById(orderId);
+  if (!ticket) return;
 
-    // Load ticket into POS for cashier to take payment
-    order = [
-      ...(ticket.foodItems || []),
-      ...(ticket.drinkItems || [])
-    ].map(it => ({
-      ...it,
-      mods: Array.isArray(it.mods) ? it.mods : [],
-      final: Number(it.final ?? it.price ?? 0)
-    }));
+  // 1️⃣ Load ticket items back into POS order[]
+  order = [
+    ...(ticket.foodItems || []),
+    ...(ticket.drinkItems || [])
+  ].map(it => ({
+    ...it,
+    mods: Array.isArray(it.mods) ? it.mods : [],
+    final: Number(it.final ?? it.price ?? 0)
+  }));
 
-    payingOrderId = ticket.id;
+  // 2️⃣ Remember which existing unpaid ticket we're paying
+  payingOrderId = ticket.id;
 
-    // Switch to POS tab
-    document.querySelector('[data-tab="pos-view"]').click();
-
-    isCash = false;
-    updateOrder();
-    renderCustomerView();
-    return; // IMPORTANT: stop here so it doesn't run Retrieve logic
+  // 3️⃣ NEW: restore service type + table number from the ticket
+  //    - This stops it from jumping back to the default "堂食"
+  if (orderTypeSelect) {
+    // ticket.serviceType will be 'phone', 'takeaway', 'dine-in', 'deliveroo', 'justeat', etc.
+    orderTypeSelect.value = ticket.serviceType || 'dine-in';
   }
+
+  const tableInput = document.getElementById('order-number');
+  if (tableInput) {
+    // For phone / takeaway / delivery this may be empty, which is fine
+    tableInput.value = ticket.tableNumber || '';
+  }
+
+  //    If you have a helper that highlights the selected table button,
+  //    you can also call it here, e.g.:
+  //    highlightTableButton(ticket.tableNumber);
+
+  // 4️⃣ Move cashier to POS tab so they can choose Payment → Card / Cash
+  document.querySelector('[data-tab="pos-view"]').click();
+
+  // 5️⃣ Refresh totals + buttons
+  isCash = false;
+  updateOrder();
+  renderCustomerView();
+
+  // Optional but nice: keep platform / unpaid buttons in sync with service type
+  if (typeof syncPlatformBtnState === 'function') {
+    syncPlatformBtnState();
+  }
+  if (typeof syncUnpaidBtnState === 'function') {
+    syncUnpaidBtnState();
+  }
+  if (typeof updatePaymentButtonsState === 'function') {
+    updatePaymentButtonsState();
+  }
+
+  return; // IMPORTANT: stop here so it doesn't run Retrieve logic
+}
 
   // ✅ RETRIEVE (per item)
   const btn = e.target.closest('.retrieve-btn');
