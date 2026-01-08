@@ -1,3 +1,36 @@
+/* header */
+header.top-nav nav {
+  display: flex;
+  justify-content: space-between;
+  background: #01392c;
+  border-bottom: 1px solid #ddd;
+  color: #fff;
+  flex-shrink: 0;
+  height: 42px;
+}
+header.top-nav nav .tab {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1em;
+  text-align: center;
+}
+header.top-nav nav .tab:hover,
+header.top-nav nav .tab.active {
+  color: #c39c4b;
+  border-bottom: 3px solid var(--green);
+  /* background-color: ; highlight color */
+}
+/* main */
+main {
+  flex: 1;
+  height: 100%; /* fix later */
+  overflow-y: auto; /* fix later */
+}
+
+/* Views */
 /* POS view fills the space under the tabs */
 #pos-view {
   height: 100%;
@@ -465,28 +498,6 @@ button.big {
   border-radius: 8px;
   border: 1px solid #ccc;
   font-size: 0.9em;
-}
-
-/* Top tabs */
-.tabs {
-  display: flex;
-  background: #01392c;
-  border-bottom: 1px solid #ddd;
-  flex-shrink: 0;
-}
-.tab {
-  flex: 1;
-  padding: 10px;
-  border: none;
-  color: #fff;
-  background: none;
-  cursor: pointer;
-  font-weight: bold;
-  font-size: 1em;
-}
-.tab.active {
-  color: #c39c4b;
-  border-bottom: 3px solid var(--green);
 }
 
 /* Kitchen / Bar ticket layout */

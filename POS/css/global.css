@@ -73,8 +73,8 @@ body {
 body {
   font-family: -apple-system, BlinkMacSystemFont, "PingFang HK", sans-serif;
   background: #f0f2f5;
-  height: 100vh; /* full viewport height */
-  min-height: 100vh;
+  /* height: 100vh;  */
+  /* min-height: 100vh; */
   /* min-height: 100dvh; */
   display: flex;
   flex-direction: column;

@@ -21,572 +21,582 @@
   </head>
   <body>
     <!-- Top tabs -->
-    <div class="tabs">
-      <button class="tab active" data-tab="pos-view">落單</button>
-      <button class="tab" data-tab="kitchen-view">廚房</button>
-      <button class="tab" data-tab="bar-view">水吧</button>
-      <button class="tab" data-tab="all-orders-view">全部訂單</button>
-      <button class="tab" data-tab="customer-view">Customer View</button>
-      <button class="tab" data-tab="waitlist-view">等位</button>
-      <button class="tab" data-tab="admin-view">Admin</button>
-    </div>
+    <header class="top-nav">
+      <nav>
+        <div class="tab active" data-tab="pos-view">落單</div>
+        <div class="tab" data-tab="kitchen-view">廚房</div>
+        <div class="tab" data-tab="bar-view">水吧</div>
+        <div class="tab" data-tab="all-orders-view">全部訂單</div>
+        <div class="tab" data-tab="customer-view">Customer View</div>
+        <div class="tab" data-tab="waitlist-view">等位</div>
+        <div class="tab" data-tab="admin-view">Admin</div>
+      </nav>
+    </header>
+    <main>
+      <!-- POS view -->
+      <div id="pos-view">
+        <div class="main">
+          <div class="left" id="menu-content"></div>
 
-    <!-- POS view -->
-    <div id="pos-view">
-      <div class="main">
-        <div class="left" id="menu-content"></div>
+          <div class="right">
+            <!-- Order meta (order #, service, channel) -->
+            <div class="order-meta">
+              <!-- Table number (we keep the same id so JS still works) -->
+              <div class="order-meta-row">
+                <label>Table #</label>
+                <div class="table-selector">
+                  <div class="table-buttons">
+                    <button type="button" class="table-btn" data-table="1">
+                      1
+                    </button>
+                    <button type="button" class="table-btn" data-table="2">
+                      2
+                    </button>
+                    <button type="button" class="table-btn" data-table="3">
+                      3
+                    </button>
+                    <button type="button" class="table-btn" data-table="4">
+                      4
+                    </button>
+                    <button type="button" class="table-btn" data-table="5">
+                      5
+                    </button>
+                    <button type="button" class="table-btn" data-table="6">
+                      6
+                    </button>
+                    <button type="button" class="table-btn" data-table="7">
+                      7
+                    </button>
+                    <button type="button" class="table-btn" data-table="8">
+                      8
+                    </button>
+                  </div>
 
-        <div class="right">
-          <!-- Order meta (order #, service, channel) -->
-          <div class="order-meta">
-            <!-- Table number (we keep the same id so JS still works) -->
-            <div class="order-meta-row">
-              <label>Table #</label>
-              <div class="table-selector">
-                <div class="table-buttons">
-                  <button type="button" class="table-btn" data-table="1">
-                    1
-                  </button>
-                  <button type="button" class="table-btn" data-table="2">
-                    2
-                  </button>
-                  <button type="button" class="table-btn" data-table="3">
-                    3
-                  </button>
-                  <button type="button" class="table-btn" data-table="4">
-                    4
-                  </button>
-                  <button type="button" class="table-btn" data-table="5">
-                    5
-                  </button>
-                  <button type="button" class="table-btn" data-table="6">
-                    6
-                  </button>
-                  <button type="button" class="table-btn" data-table="7">
-                    7
-                  </button>
-                  <button type="button" class="table-btn" data-table="8">
-                    8
-                  </button>
+                  <!-- Hidden field so existing JS that reads #order-number still works -->
+                  <input id="order-number" type="hidden" />
                 </div>
+              </div>
 
-                <!-- Hidden field so existing JS that reads #order-number still works -->
-                <input id="order-number" type="hidden" />
+              <div class="order-meta-row">
+                <label for="order-type">Type</label>
+                <select id="order-type">
+                  <option value="dine-in">堂食</option>
+                  <option value="takeaway">現場外賣</option>
+                  <option value="phone">電話外賣</option>
+                  <option value="deliveroo">Deliveroo</option>
+                  <option value="justeat">Just Eat</option>
+                </select>
+              </div>
+
+              <!-- Expected pickup time -->
+              <div class="order-meta-row">
+                <label for="pickup-time">Pickup</label>
+                <input id="pickup-time" type="time" step="60" />
               </div>
             </div>
 
-            <div class="order-meta-row">
-              <label for="order-type">Type</label>
-              <select id="order-type">
-                <option value="dine-in">堂食</option>
-                <option value="takeaway">現場外賣</option>
-                <option value="phone">電話外賣</option>
-                <option value="deliveroo">Deliveroo</option>
-                <option value="justeat">Just Eat</option>
-              </select>
+            <!-- Order summary -->
+            <h2
+              style="font-size: 1.8em; color: var(--green); margin-bottom: 18px"
+            >
+              Order Summary
+            </h2>
+            <div id="order-list">
+              <p class="empty-order">No items yet</p>
             </div>
 
-            <!-- Expected pickup time -->
-            <div class="order-meta-row">
-              <label for="pickup-time">Pickup</label>
-              <input id="pickup-time" type="time" step="60" />
+            <!-- Discounts + total + Pay -->
+            <div
+              id="discount-summary"
+              style="text-align: right; color: #d32f2f; font-weight: bold"
+            ></div>
+            <div class="total">
+              <span>Total <span id="total">£0.00</span></span>
             </div>
-          </div>
 
-          <!-- Order summary -->
-          <h2
-            style="font-size: 1.8em; color: var(--green); margin-bottom: 18px"
-          >
-            Order Summary
-          </h2>
-          <div id="order-list">
-            <p class="empty-order">No items yet</p>
-          </div>
-
-          <!-- Discounts + total + Pay -->
-          <div
-            id="discount-summary"
-            style="text-align: right; color: #d32f2f; font-weight: bold"
-          ></div>
-          <div class="total">
-            <span>Total <span id="total">£0.00</span></span>
-          </div>
-
-          <!-- Card, Cash, Add, Unpaid pay buttons -->
-          <div class="order-footer">
-            <div class="pay-buttons">
-              <button class="pay-btn" id="payment-btn" type="button">
-                Payment
-              </button>
-              <button class="pay-btn" id="platform-btn" type="button">
-                Add
-              </button>
-              <button class="pay-btn" id="unpaid-btn" type="button">
-                Unpaid
-              </button>
+            <!-- Card, Cash, Add, Unpaid pay buttons -->
+            <div class="order-footer">
+              <div class="pay-buttons">
+                <button class="pay-btn" id="payment-btn" type="button">
+                  Payment
+                </button>
+                <button class="pay-btn" id="platform-btn" type="button">
+                  Add
+                </button>
+                <button class="pay-btn" id="unpaid-btn" type="button">
+                  Unpaid
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- 🔍 Order review popup (for cashier to read items) -->
-    <div id="review-modal" style="display: none">
-      <div class="review-box">
-        <div class="review-head">
-          <span>確認訂單</span>
-          <!-- ✖ close button -->
-          <button type="button" id="review-close" class="review-close">
-            &times;
-          </button>
+      <!-- 🔍 Order review popup (for cashier to read items) -->
+      <div id="review-modal" style="display: none">
+        <div class="review-box">
+          <div class="review-head">
+            <span>確認訂單</span>
+            <!-- ✖ close button -->
+            <button type="button" id="review-close" class="review-close">
+              &times;
+            </button>
+          </div>
+
+          <!-- 💳 NEW: Cash + Card controls inside popup -->
+          <div class="review-pay-buttons">
+            <button
+              type="button"
+              id="review-card-btn"
+              class="pay-btn review-btn-card"
+            >
+              Card
+            </button>
+            <button
+              type="button"
+              id="review-cash-btn"
+              class="pay-btn review-btn-cash"
+            >
+              Cash
+            </button>
+          </div>
+
+          <div id="review-body" class="review-body"></div>
         </div>
-
-        <!-- 💳 NEW: Cash + Card controls inside popup -->
-        <div class="review-pay-buttons">
-          <button
-            type="button"
-            id="review-card-btn"
-            class="pay-btn review-btn-card"
-          >
-            Card
-          </button>
-          <button
-            type="button"
-            id="review-cash-btn"
-            class="pay-btn review-btn-cash"
-          >
-            Cash
-          </button>
-        </div>
-
-        <div id="review-body" class="review-body"></div>
       </div>
-    </div>
 
-    <!-- 💳 Card Pending Payment Popup -->
-    <div id="card-pending-modal" style="display: none">
-      <div class="card-pending-box">
-        <div class="card-pending-head">
-          <span>...</span>
-          <!-- small X on the top-right -->
+      <!-- 💳 Card Pending Payment Popup -->
+      <div id="card-pending-modal" style="display: none">
+        <div class="card-pending-box">
+          <div class="card-pending-head">
+            <span>...</span>
+            <!-- small X on the top-right -->
+            <button
+              type="button"
+              id="card-pending-close"
+              class="card-pending-close"
+            >
+              &times;
+            </button>
+          </div>
+
+          <div class="card-pending-body">
+            <p>等候卡機付款</p>
+            <p class="card-pending-amount">
+              Total: <span id="card-pending-total"></span>
+            </p>
+          </div>
+
+          <!-- Big confirm button at the bottom -->
           <button
             type="button"
-            id="card-pending-close"
-            class="card-pending-close"
+            id="card-pending-confirm"
+            class="pay-btn card-pending-confirm"
           >
-            &times;
+            Confirm payment received
           </button>
         </div>
+      </div>
 
-        <div class="card-pending-body">
-          <p>等候卡機付款</p>
-          <p class="card-pending-amount">
-            Total: <span id="card-pending-total"></span>
-          </p>
+      <!-- Kitchen view (for food items) -->
+      <div id="kitchen-view" style="display: none">
+        <div id="kitchen-orders" class="ticket-grid"></div>
+      </div>
+
+      <!-- Bar view (for drinks) -->
+      <div id="bar-view" style="display: none">
+        <div id="bar-orders" class="ticket-grid"></div>
+      </div>
+
+      <!-- All orders view (combined food + drinks) -->
+      <div id="all-orders-view" style="display: none">
+        <div
+          style="
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 8px 16px;
+            background: #f0f2f5;
+          "
+        ></div>
+
+        <div id="all-orders" class="ticket-grid"></div>
+      </div>
+
+      <!-- Customer view -->
+      <div id="customer-view" style="display: none">
+        <div id="customer-screen" class="customer-screen"></div>
+      </div>
+
+      <!-- Waitlist view -->
+      <div id="waitlist-view" style="display: none">
+        <div class="wl-page">
+          <div class="wl-hero">
+            <div class="wl-hero-title">
+              登記候位表 <span>Restaurant Waitlist</span>
+            </div>
+          </div>
+
+          <div class="wl-body">
+            <!-- Form row -->
+            <div class="wl-form">
+              <div class="wl-field">
+                <label>姓名 <span>Customer Name</span></label>
+                <input
+                  id="wait-name"
+                  type="text"
+                  placeholder="輸入 Enter customer name"
+                />
+              </div>
+
+              <div class="wl-field">
+                <label>人數 <span>Party Size</span></label>
+                <select id="wait-pax">
+                  <option value="">選擇 Select size</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
+                  <option value="8">8</option>
+                </select>
+              </div>
+
+              <button id="add-wait-btn" class="wl-confirm-btn" type="button">
+                確認 Confirm
+              </button>
+            </div>
+
+            <!-- Big counter card -->
+            <div class="wl-count-card">
+              <div class="wl-count-number" id="wl-count">0</div>
+              <div class="wl-count-label">
+                等待人數 <span>Parties Waiting</span>
+              </div>
+            </div>
+
+            <!-- Table -->
+            <div class="wl-table-wrap">
+              <table class="wl-table">
+                <colgroup>
+                  <col style="width: 20%" />
+                  <col style="width: 20%" />
+                  <col style="width: 20%" />
+                  <col style="width: 20%" />
+                  <col style="width: 20%" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>號碼 POSITION</th>
+                    <th>姓名 CUSTOMER NAME</th>
+                    <th>人數 PARTY SIZE</th>
+                    <th>等待時間 WAIT TIME</th>
+                    <th>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody id="waitlist-tbody">
+                  <!-- rows injected by JS -->
+                </tbody>
+              </table>
+
+              <!-- Empty state -->
+              <div id="wl-empty" class="wl-empty" style="display: none">
+                <div class="wl-empty-title">No customers waiting</div>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <!-- Big confirm button at the bottom -->
-        <button
-          type="button"
-          id="card-pending-confirm"
-          class="pay-btn card-pending-confirm"
+      <!-- Admin view -->
+      <div id="admin-view" style="display: none">
+        <div
+          style="
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: #f0f2f5;
+            border-bottom: 1px solid #ddd;
+          "
         >
-          Confirm payment received
-        </button>
-      </div>
-    </div>
-
-    <!-- Kitchen view (for food items) -->
-    <div id="kitchen-view" style="display: none">
-      <div id="kitchen-orders" class="ticket-grid"></div>
-    </div>
-
-    <!-- Bar view (for drinks) -->
-    <div id="bar-view" style="display: none">
-      <div id="bar-orders" class="ticket-grid"></div>
-    </div>
-
-    <!-- All orders view (combined food + drinks) -->
-    <div id="all-orders-view" style="display: none">
-      <div
-        style="
-          display: flex;
-          justify-content: flex-end;
-          align-items: center;
-          padding: 8px 16px;
-          background: #f0f2f5;
-        "
-      ></div>
-
-      <div id="all-orders" class="ticket-grid"></div>
-    </div>
-
-    <!-- Customer view -->
-    <div id="customer-view" style="display: none">
-      <div id="customer-screen" class="customer-screen"></div>
-    </div>
-
-    <!-- Waitlist view -->
-    <div id="waitlist-view" style="display: none">
-      <div class="wl-page">
-        <div class="wl-hero">
-          <div class="wl-hero-title">
-            登記候位表 <span>Restaurant Waitlist</span>
+          <div style="display: flex; gap: 10px; align-items: center">
+            <strong>Daily Sales</strong>
           </div>
-        </div>
-
-        <div class="wl-body">
-          <!-- Form row -->
-          <div class="wl-form">
-            <div class="wl-field">
-              <label>姓名 <span>Customer Name</span></label>
-              <input
-                id="wait-name"
-                type="text"
-                placeholder="輸入 Enter customer name"
-              />
-            </div>
-
-            <div class="wl-field">
-              <label>人數 <span>Party Size</span></label>
-              <select id="wait-pax">
-                <option value="">選擇 Select size</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-                <option value="6">6</option>
-                <option value="7">7</option>
-                <option value="8">8</option>
-              </select>
-            </div>
-
-            <button id="add-wait-btn" class="wl-confirm-btn" type="button">
-              確認 Confirm
-            </button>
-          </div>
-
-          <!-- Big counter card -->
-          <div class="wl-count-card">
-            <div class="wl-count-number" id="wl-count">0</div>
-            <div class="wl-count-label">
-              等待人數 <span>Parties Waiting</span>
-            </div>
-          </div>
-
-          <!-- Table -->
-          <div class="wl-table-wrap">
-            <table class="wl-table">
-              <colgroup>
-                <col style="width: 20%" />
-                <col style="width: 20%" />
-                <col style="width: 20%" />
-                <col style="width: 20%" />
-                <col style="width: 20%" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>號碼 POSITION</th>
-                  <th>姓名 CUSTOMER NAME</th>
-                  <th>人數 PARTY SIZE</th>
-                  <th>等待時間 WAIT TIME</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody id="waitlist-tbody">
-                <!-- rows injected by JS -->
-              </tbody>
-            </table>
-
-            <!-- Empty state -->
-            <div id="wl-empty" class="wl-empty" style="display: none">
-              <div class="wl-empty-title">No customers waiting</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Admin view -->
-    <div id="admin-view" style="display: none">
-      <div
-        style="
-          display: flex;
-          gap: 12px;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px 16px;
-          background: #f0f2f5;
-          border-bottom: 1px solid #ddd;
-        "
-      >
-        <div style="display: flex; gap: 10px; align-items: center">
-          <strong>Daily Sales</strong>
-        </div>
-        <button id="export-csv-btn" type="button" class="export-btn">
-          Export CSV
-        </button>
-      </div>
-
-      <div id="admin-summary" style="padding: 16px"></div>
-    </div>
-
-    <!-- Options modal -->
-    <div
-      id="modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-title"
-    >
-      <div class="modal-box">
-        <div class="modal-head" id="modal-title">選擇選項</div>
-        <div class="modal-body">
-          <!-- (all your opts groups – unchanged) -->
-          <!-- 熱 / 凍 -->
-          <div class="opts" id="hot-cold-opts" style="display: none">
-            <div class="opt">熱</div>
-            <div class="opt">凍</div>
-          </div>
-
-          <!-- 粒粒椰汁紅豆冰 -->
-          <div class="opts" id="redbean-opts" style="display: none">
-            <div class="opt">少冰</div>
-            <div class="opt">走冰</div>
-            <div class="opt">少椰奶</div>
-            <div class="opt">少花奶</div>
-            <div class="opt">走椰奶</div>
-            <div class="opt">走花奶</div>
-          </div>
-
-          <!-- 好立克 & 阿華田 -->
-          <div class="opts" id="ovaltine-horlicks-opts" style="display: none">
-            <div class="opt">少冰</div>
-            <div class="opt">走冰</div>
-            <div class="opt">煉奶</div>
-            <div class="opt">少甜</div>
-          </div>
-
-          <!-- 檸茶 & 檸水 -->
-          <div class="opts" id="lemon-opts" style="display: none">
-            <div class="opt">少冰</div>
-            <div class="opt">走冰</div>
-          </div>
-
-          <!-- 柚子薑蜜 -->
-          <div class="opts" id="citron-opts" style="display: none">
-            <div class="opt">凍</div>
-            <div class="opt">少冰</div>
-            <div class="opt">走冰</div>
-          </div>
-
-          <!-- 奶茶專用 -->
-          <div class="opts" id="milktea-opts" style="display: none">
-            <div class="opt">少花奶</div>
-            <div class="opt">多花奶</div>
-            <div class="opt">英國版</div>
-            <div class="opt">少冰</div>
-            <div class="opt">走冰</div>
-            <div class="opt">冰底</div>
-            <div class="opt">煉奶</div>
-            <div class="opt">少甜</div>
-          </div>
-
-          <!-- 咖啡專用 -->
-          <div class="opts" id="coffee-opts" style="display: none">
-            <div class="opt">少冰</div>
-            <div class="opt">走冰</div>
-            <div class="opt">牛奶</div>
-            <div class="opt">花奶</div>
-            <div class="opt">少奶</div>
-            <div class="opt">煉奶</div>
-            <div class="opt">少甜</div>
-          </div>
-
-          <!-- 鴛鴦專用 -->
-          <div class="opts" id="yuenyeung-opts" style="display: none">
-            <div class="opt">少冰</div>
-            <div class="opt">走冰</div>
-            <div class="opt">少花奶</div>
-            <div class="opt">煉奶</div>
-            <div class="opt">少甜</div>
-          </div>
-
-          <!-- 西多士專用 -->
-          <div class="opts" id="french-toast-opts" style="display: none">
-            <div class="opt">煉奶</div>
-          </div>
-
-          <!-- 主食選項 -->
-          <div class="opts" id="brisket-opts" style="display: none">
-            <div class="opt">多飯</div>
-            <div class="opt">少飯</div>
-            <div class="opt">撈粗</div>
-            <div class="opt">撈拉麵</div>
-            <div class="opt">撈丁</div>
-            <div class="opt">湯粗</div>
-            <div class="opt">湯拉麵</div>
-            <div class="opt">湯丁</div>
-            <div class="opt">淨牛腩</div>
-            <div class="opt">淨牛筋</div>
-            <div class="opt">多牛腩</div>
-            <div class="opt">多牛筋</div>
-            <div class="opt">少牛腩</div>
-            <div class="opt">少牛筋</div>
-            <div class="opt">走乾蒜</div>
-          </div>
-          <div class="opts" id="tomato-baked-opts" style="display: none">
-            <div class="opt">多飯</div>
-            <div class="opt">少飯</div>
-            <div class="opt">意粉</div>
-            <div class="opt">多菠蘿</div>
-            <div class="opt">走菠蘿</div>
-            <div class="opt">轉雞扒</div>
-            <div class="opt">多芝士</div>
-            <div class="opt">少芝士</div>
-            <div class="opt">走芝士</div>
-            <div class="opt">免焗</div>
-          </div>
-          <div class="opts" id="portuguese-opts" style="display: none">
-            <div class="opt">多飯</div>
-            <div class="opt">少飯</div>
-            <div class="opt">意粉</div>
-            <div class="opt">轉豬扒</div>
-            <div class="opt">多芝士</div>
-            <div class="opt">少芝士</div>
-            <div class="opt">走芝士</div>
-            <div class="opt">免焗</div>
-          </div>
-          <div class="opts" id="charsiu-opts" style="display: none">
-            <div class="opt">多飯</div>
-            <div class="opt">少飯</div>
-            <div class="opt">煎熟蛋</div>
-            <div class="opt">撈粗</div>
-            <div class="opt">走乾蒜</div>
-          </div>
-          <div class="opts" id="kimchi-opts" style="display: none">
-            <div class="opt">多飯</div>
-            <div class="opt">少飯</div>
-            <div class="opt">多泡菜</div>
-            <div class="opt">少泡菜</div>
-            <div class="opt">走泡菜</div>
-            <div class="opt">走乾蒜</div>
-          </div>
-          <div class="opts" id="basic-rice-opts" style="display: none">
-            <div class="opt">多飯</div>
-            <div class="opt">少飯</div>
-          </div>
-          <div class="opts" id="plain-curry-opts" style="display: none">
-            <div class="opt">多飯</div>
-            <div class="opt">少飯</div>
-            <div class="opt">多薯仔</div>
-            <div class="opt">少薯仔</div>
-            <div class="opt">走薯仔</div>
-            <div class="opt">走乾蒜</div>
-          </div>
-          <div class="opts" id="baked-curry-opts" style="display: none">
-            <div class="opt">多飯</div>
-            <div class="opt">少飯</div>
-            <div class="opt">意粉</div>
-            <div class="opt">多薯仔</div>
-            <div class="opt">少薯仔</div>
-            <div class="opt">走薯仔</div>
-            <div class="opt">多芝士</div>
-            <div class="opt">少芝士</div>
-            <div class="opt">走芝士</div>
-            <div class="opt">免焗</div>
-          </div>
-          <div class="opts" id="spring-onion-opts" style="display: none">
-            <div class="opt">多飯</div>
-            <div class="opt">少飯</div>
-            <div class="opt">撈丁</div>
-            <div class="opt">撈粗</div>
-            <div class="opt">撈拉麵</div>
-            <div class="opt">湯米</div>
-            <div class="opt">湯通</div>
-            <div class="opt">湯意</div>
-            <div class="opt">多蔥油</div>
-            <div class="opt">少蔥油</div>
-            <div class="opt">煎熟蛋</div>
-            <div class="opt">走乾蒜</div>
-          </div>
-          <div class="opts" id="chakee-noodles-opts" style="display: none">
-            <div class="opt">丁</div>
-            <div class="opt">湯米</div>
-            <div class="opt">湯通</div>
-            <div class="opt">湯意</div>
-            <div class="opt">湯粗</div>
-            <div class="opt">湯拉麵</div>
-            <div class="opt">太陽蛋</div>
-            <div class="opt">煎熟蛋</div>
-            <div class="opt">炒熟蛋</div>
-            <div class="opt">走包</div>
-            <div class="opt">包走牛油</div>
-            <div class="opt">包少牛油</div>
-            <div class="opt">包多牛油</div>
-            <div class="opt">包唔烘</div>
-            <div class="opt">包烘耐啲</div>
-          </div>
-
-          <!-- 茶記粉面 - 餐 -->
-          <div class="opts" id="set-meal-opts" style="display: none">
-            <div class="opt">餐</div>
-          </div>
-
-          <!-- Global options (all items) -->
-          <div class="opts" id="global-opts" style="display: none">
-            <div class="opt">外賣</div>
-            <div class="opt">後上</div>
-          </div>
-
-          <textarea placeholder="特別要求..."></textarea>
-        </div>
-        <div class="modal-footer">
-          <button class="cancel" id="cancel">Cancel</button>
-          <button class="confirm" id="add">Add to Order</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Payment modal -->
-    <div id="pay-modal">
-      <div class="pay-box">
-        <div class="pay-head">Payment</div>
-        <div class="pay-body">
-          <div class="pay-row">
-            <span>Amount due:</span>
-            <strong id="amount-due">£0.00</strong>
-          </div>
-
-          <div class="pay-row">
-            <label for="amount-received">Cash received:</label>
-            <input type="number" id="amount-received" step="0.01" min="0" />
-          </div>
-          <!-- QUICK CASH PRESETS (ADD THIS) -->
-          <div class="cash-presets">
-            <button type="button" class="preset-btn" data-val="exact">
-              Exact
-            </button>
-            <button type="button" class="preset-btn" data-val="10">£10</button>
-            <button type="button" class="preset-btn" data-val="20">£20</button>
-            <button type="button" class="preset-btn" data-val="30">£30</button>
-            <button type="button" class="preset-btn" data-val="50">£50</button>
-          </div>
-
-          <div class="pay-row pay-change">
-            <span>Change:</span>
-            <strong id="change-amount">£0.00</strong>
-          </div>
-        </div>
-        <div class="pay-footer">
-          <button type="button" id="pay-cancel" class="cancel">Cancel</button>
-          <button type="button" id="pay-confirm" class="confirm">
-            Confirm
+          <button id="export-csv-btn" type="button" class="export-btn">
+            Export CSV
           </button>
         </div>
-      </div>
-    </div>
 
+        <div id="admin-summary" style="padding: 16px"></div>
+      </div>
+
+      <!-- Options modal -->
+      <div
+        id="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
+        <div class="modal-box">
+          <div class="modal-head" id="modal-title">選擇選項</div>
+          <div class="modal-body">
+            <!-- (all your opts groups – unchanged) -->
+            <!-- 熱 / 凍 -->
+            <div class="opts" id="hot-cold-opts" style="display: none">
+              <div class="opt">熱</div>
+              <div class="opt">凍</div>
+            </div>
+
+            <!-- 粒粒椰汁紅豆冰 -->
+            <div class="opts" id="redbean-opts" style="display: none">
+              <div class="opt">少冰</div>
+              <div class="opt">走冰</div>
+              <div class="opt">少椰奶</div>
+              <div class="opt">少花奶</div>
+              <div class="opt">走椰奶</div>
+              <div class="opt">走花奶</div>
+            </div>
+
+            <!-- 好立克 & 阿華田 -->
+            <div class="opts" id="ovaltine-horlicks-opts" style="display: none">
+              <div class="opt">少冰</div>
+              <div class="opt">走冰</div>
+              <div class="opt">煉奶</div>
+              <div class="opt">少甜</div>
+            </div>
+
+            <!-- 檸茶 & 檸水 -->
+            <div class="opts" id="lemon-opts" style="display: none">
+              <div class="opt">少冰</div>
+              <div class="opt">走冰</div>
+            </div>
+
+            <!-- 柚子薑蜜 -->
+            <div class="opts" id="citron-opts" style="display: none">
+              <div class="opt">凍</div>
+              <div class="opt">少冰</div>
+              <div class="opt">走冰</div>
+            </div>
+
+            <!-- 奶茶專用 -->
+            <div class="opts" id="milktea-opts" style="display: none">
+              <div class="opt">少花奶</div>
+              <div class="opt">多花奶</div>
+              <div class="opt">英國版</div>
+              <div class="opt">少冰</div>
+              <div class="opt">走冰</div>
+              <div class="opt">冰底</div>
+              <div class="opt">煉奶</div>
+              <div class="opt">少甜</div>
+            </div>
+
+            <!-- 咖啡專用 -->
+            <div class="opts" id="coffee-opts" style="display: none">
+              <div class="opt">少冰</div>
+              <div class="opt">走冰</div>
+              <div class="opt">牛奶</div>
+              <div class="opt">花奶</div>
+              <div class="opt">少奶</div>
+              <div class="opt">煉奶</div>
+              <div class="opt">少甜</div>
+            </div>
+
+            <!-- 鴛鴦專用 -->
+            <div class="opts" id="yuenyeung-opts" style="display: none">
+              <div class="opt">少冰</div>
+              <div class="opt">走冰</div>
+              <div class="opt">少花奶</div>
+              <div class="opt">煉奶</div>
+              <div class="opt">少甜</div>
+            </div>
+
+            <!-- 西多士專用 -->
+            <div class="opts" id="french-toast-opts" style="display: none">
+              <div class="opt">煉奶</div>
+            </div>
+
+            <!-- 主食選項 -->
+            <div class="opts" id="brisket-opts" style="display: none">
+              <div class="opt">多飯</div>
+              <div class="opt">少飯</div>
+              <div class="opt">撈粗</div>
+              <div class="opt">撈拉麵</div>
+              <div class="opt">撈丁</div>
+              <div class="opt">湯粗</div>
+              <div class="opt">湯拉麵</div>
+              <div class="opt">湯丁</div>
+              <div class="opt">淨牛腩</div>
+              <div class="opt">淨牛筋</div>
+              <div class="opt">多牛腩</div>
+              <div class="opt">多牛筋</div>
+              <div class="opt">少牛腩</div>
+              <div class="opt">少牛筋</div>
+              <div class="opt">走乾蒜</div>
+            </div>
+            <div class="opts" id="tomato-baked-opts" style="display: none">
+              <div class="opt">多飯</div>
+              <div class="opt">少飯</div>
+              <div class="opt">意粉</div>
+              <div class="opt">多菠蘿</div>
+              <div class="opt">走菠蘿</div>
+              <div class="opt">轉雞扒</div>
+              <div class="opt">多芝士</div>
+              <div class="opt">少芝士</div>
+              <div class="opt">走芝士</div>
+              <div class="opt">免焗</div>
+            </div>
+            <div class="opts" id="portuguese-opts" style="display: none">
+              <div class="opt">多飯</div>
+              <div class="opt">少飯</div>
+              <div class="opt">意粉</div>
+              <div class="opt">轉豬扒</div>
+              <div class="opt">多芝士</div>
+              <div class="opt">少芝士</div>
+              <div class="opt">走芝士</div>
+              <div class="opt">免焗</div>
+            </div>
+            <div class="opts" id="charsiu-opts" style="display: none">
+              <div class="opt">多飯</div>
+              <div class="opt">少飯</div>
+              <div class="opt">煎熟蛋</div>
+              <div class="opt">撈粗</div>
+              <div class="opt">走乾蒜</div>
+            </div>
+            <div class="opts" id="kimchi-opts" style="display: none">
+              <div class="opt">多飯</div>
+              <div class="opt">少飯</div>
+              <div class="opt">多泡菜</div>
+              <div class="opt">少泡菜</div>
+              <div class="opt">走泡菜</div>
+              <div class="opt">走乾蒜</div>
+            </div>
+            <div class="opts" id="basic-rice-opts" style="display: none">
+              <div class="opt">多飯</div>
+              <div class="opt">少飯</div>
+            </div>
+            <div class="opts" id="plain-curry-opts" style="display: none">
+              <div class="opt">多飯</div>
+              <div class="opt">少飯</div>
+              <div class="opt">多薯仔</div>
+              <div class="opt">少薯仔</div>
+              <div class="opt">走薯仔</div>
+              <div class="opt">走乾蒜</div>
+            </div>
+            <div class="opts" id="baked-curry-opts" style="display: none">
+              <div class="opt">多飯</div>
+              <div class="opt">少飯</div>
+              <div class="opt">意粉</div>
+              <div class="opt">多薯仔</div>
+              <div class="opt">少薯仔</div>
+              <div class="opt">走薯仔</div>
+              <div class="opt">多芝士</div>
+              <div class="opt">少芝士</div>
+              <div class="opt">走芝士</div>
+              <div class="opt">免焗</div>
+            </div>
+            <div class="opts" id="spring-onion-opts" style="display: none">
+              <div class="opt">多飯</div>
+              <div class="opt">少飯</div>
+              <div class="opt">撈丁</div>
+              <div class="opt">撈粗</div>
+              <div class="opt">撈拉麵</div>
+              <div class="opt">湯米</div>
+              <div class="opt">湯通</div>
+              <div class="opt">湯意</div>
+              <div class="opt">多蔥油</div>
+              <div class="opt">少蔥油</div>
+              <div class="opt">煎熟蛋</div>
+              <div class="opt">走乾蒜</div>
+            </div>
+            <div class="opts" id="chakee-noodles-opts" style="display: none">
+              <div class="opt">丁</div>
+              <div class="opt">湯米</div>
+              <div class="opt">湯通</div>
+              <div class="opt">湯意</div>
+              <div class="opt">湯粗</div>
+              <div class="opt">湯拉麵</div>
+              <div class="opt">太陽蛋</div>
+              <div class="opt">煎熟蛋</div>
+              <div class="opt">炒熟蛋</div>
+              <div class="opt">走包</div>
+              <div class="opt">包走牛油</div>
+              <div class="opt">包少牛油</div>
+              <div class="opt">包多牛油</div>
+              <div class="opt">包唔烘</div>
+              <div class="opt">包烘耐啲</div>
+            </div>
+
+            <!-- 茶記粉面 - 餐 -->
+            <div class="opts" id="set-meal-opts" style="display: none">
+              <div class="opt">餐</div>
+            </div>
+
+            <!-- Global options (all items) -->
+            <div class="opts" id="global-opts" style="display: none">
+              <div class="opt">外賣</div>
+              <div class="opt">後上</div>
+            </div>
+
+            <textarea placeholder="特別要求..."></textarea>
+          </div>
+          <div class="modal-footer">
+            <button class="cancel" id="cancel">Cancel</button>
+            <button class="confirm" id="add">Add to Order</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Payment modal -->
+      <div id="pay-modal">
+        <div class="pay-box">
+          <div class="pay-head">Payment</div>
+          <div class="pay-body">
+            <div class="pay-row">
+              <span>Amount due:</span>
+              <strong id="amount-due">£0.00</strong>
+            </div>
+
+            <div class="pay-row">
+              <label for="amount-received">Cash received:</label>
+              <input type="number" id="amount-received" step="0.01" min="0" />
+            </div>
+            <!-- QUICK CASH PRESETS (ADD THIS) -->
+            <div class="cash-presets">
+              <button type="button" class="preset-btn" data-val="exact">
+                Exact
+              </button>
+              <button type="button" class="preset-btn" data-val="10">
+                £10
+              </button>
+              <button type="button" class="preset-btn" data-val="20">
+                £20
+              </button>
+              <button type="button" class="preset-btn" data-val="30">
+                £30
+              </button>
+              <button type="button" class="preset-btn" data-val="50">
+                £50
+              </button>
+            </div>
+
+            <div class="pay-row pay-change">
+              <span>Change:</span>
+              <strong id="change-amount">£0.00</strong>
+            </div>
+          </div>
+          <div class="pay-footer">
+            <button type="button" id="pay-cancel" class="cancel">Cancel</button>
+            <button type="button" id="pay-confirm" class="confirm">
+              Confirm
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
     <script>
       const menu = [
         // 主食 & 咖喱系列
