@@ -1,0 +1,1375 @@
+/* header */
+header.top-nav nav {
+  display: flex;
+  justify-content: space-between;
+  background: #01392c;
+  border-bottom: 1px solid #ddd;
+  color: #fff;
+  flex-shrink: 0;
+  height: 42px;
+}
+header.top-nav nav .tab {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1em;
+  text-align: center;
+}
+header.top-nav nav .tab:hover,
+header.top-nav nav .tab.active {
+  color: #c39c4b;
+  border-bottom: 3px solid var(--green);
+  /* background-color: ; highlight color */
+}
+/* main */
+main {
+  flex: 1;
+  height: 100%; /* fix later */
+  overflow-y: auto; /* fix later */
+}
+
+/* Views */
+/* POS view fills the space under the tabs */
+#pos-view {
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: flex;
+  display: flex;
+  flex-direction: column;
+}
+
+#pos-view .main {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+
+/* Center area: left (menu) + right (order panel) */
+.main {
+  flex: 1;
+  display: flex;
+  overflow: hidden; /* children manage their own scroll */
+  min-height: 0; /* 👈 allow children to shrink & scroll */
+}
+
+.left {
+  flex: 1;
+  overflow-y: auto; /* menu scrolls */
+  padding: 14px;
+  background: #f0f2f5;
+  min-height: 0; /* 👈 inside flex row */
+}
+
+.right {
+  width: 400px;
+  flex-shrink: 0; /* fixed width column */
+  background: white;
+  border-left: 1px solid #ddd;
+  padding: 15px;
+  display: flex;
+  flex-direction: column; /* stack meta + list + footer */
+  min-height: 0; /* 👈 let #order-list take the scroll */
+  overflow: hidden; /* prevent column from growing; order-list will scroll */
+}
+
+/* Compact the Order Summary title (overrides inline style) */
+.right h2 {
+  font-size: 1.4em !important; /* was 1.8em */
+  margin-bottom: 10px !important; /* was 18px */
+}
+
+/* Order list scrolls inside fixed-height right column */
+#order-list {
+  flex: 1;
+  min-height: 0; /* 👈 otherwise it can push footer off-screen */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.category {
+  margin-bottom: 18px;
+}
+
+.category h2 {
+  margin-bottom: 2px;
+  font-size: 1em;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10x;
+}
+
+.curry-group {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.item {
+  padding: 14px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.item h3 {
+  font-size: 1.45em;
+  font-weight: 600;
+}
+
+.price {
+  font-size: 1em;
+  font-weight: bold;
+  color: var(--green);
+}
+
+.order-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.order-item .info > div:not(.price-line) {
+  font-size: 1.2em; /* +20% */
+}
+
+.order-item .price-line {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: var(--green);
+  text-align: right;
+  margin-bottom: 4px;
+}
+.delete-btn {
+  background: none;
+  border: none;
+  color: #bbb;
+  cursor: pointer;
+  font-size: 1.05em;
+  margin-left: 12px;
+}
+.delete-btn:hover {
+  color: var(--red);
+}
+
+.edit-btn {
+  background: none;
+  border: none;
+  color: #bbb; /* same grey as trash icon */
+  cursor: pointer;
+  font-size: 1.05em; /* same size as trash icon */
+  margin-left: 12px;
+}
+
+.order-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+/* --- Order summary row layout: name left, price+icons right --- */
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.order-item .info {
+  flex: 1;
+  min-width: 0; /* allow long names to wrap */
+}
+
+/* Keep name/mods on left */
+.order-item .info > div:not(.price-line) {
+  font-size: 1.2em; /* keep your +20% */
+  line-height: 1.15;
+}
+
+/* Price stays on the right near the icons */
+.order-item .price-line {
+  margin-left: auto;
+  font-size: 1.05em; /* slightly smaller than name */
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* Put price + icons in the same right column */
+.order-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px; /* compact */
+}
+
+/* Footer total + buttons live at bottom of right column */
+.total {
+  font-size: 2em;
+  font-weight: bold;
+  color: var(--green);
+  text-align: right;
+  margin: 20px 0;
+}
+button.big {
+  padding: 22px;
+  font-size: 1.5em;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  width: 100%;
+  margin-bottom: 14px;
+  font-weight: bold;
+}
+.print {
+  background: #e9ecef;
+  color: #333;
+}
+.pay {
+  background: var(--green);
+  color: white;
+}
+
+.pay-buttons {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.pay-btn {
+  flex: 1;
+  padding: 16px;
+  font-size: 1.2em;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* Card = light button */
+#card-btn {
+  background: #e9ecef;
+  color: #333;
+}
+
+/* Cash = green button */
+#pay-btn {
+  background: var(--green);
+  color: white;
+}
+
+#modal {
+  padding: 12px;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+#modal .modalc-content {
+  width: 900px;
+  max-height: 90vh;
+  padding: 14px;
+}
+
+.modal-box {
+  background: white;
+  border-radius: 22px;
+  width: 95%;
+  max-width: 920px;
+  max-height: 92vh;
+  overflow: auto;
+  gap: 4px;
+}
+.modal-head {
+  background: var(--green);
+  height: 60px;
+  color: white;
+  padding: 15px;
+  text-align: center;
+  font-size: 1.6em;
+  border-radius: 22px 22px 0 0;
+  gap: 4px;
+}
+.modal-body {
+  padding: 32px;
+}
+
+.modal button {
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.opts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin: 2px;
+}
+.opt {
+  padding: 14px 18px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  text-align: center;
+  cursor: pointer;
+  border: 2px solid transparent;
+  font-size: 16px;
+  font-weight: 600;
+  user-select: none;
+}
+.opt.sel {
+  background: var(--green);
+  color: white;
+}
+.red {
+  color: var(--red);
+  font-weight: bold;
+}
+.blue {
+  color: #007bff;
+  font-weight: bold;
+}
+
+.modal-footer {
+  height: 80px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 0 0 22px 22px;
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.modal-footer button {
+  padding: 16px 50px;
+  font-size: 1.5em;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  font-weight: bold;
+  min-width: 140px;
+}
+
+.cancel {
+  background: #ffffff;
+  color: #333;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.confirm {
+  background: var(--green);
+  color: white;
+}
+
+.empty-order {
+  text-align: center;
+  color: #aaa;
+  margin-top: 80px;
+  font-size: 1.3em;
+}
+
+.cash-toggle {
+  margin-left: 12px;
+  padding: 8px 16px;
+  font-size: 0.9em;
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  background: #f8f9fa;
+  cursor: pointer;
+}
+.cash-toggle.active {
+  border-color: var(--green);
+  background: var(--green);
+  color: white;
+  font-weight: bold;
+}
+
+/* Payment modal */
+#pay-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+}
+.pay-box {
+  background: white;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 420px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.pay-head {
+  background: var(--green);
+  color: white;
+  padding: 20px;
+  text-align: center;
+  font-size: 1.6em;
+  font-weight: bold;
+}
+.pay-body {
+  padding: 20px 24px;
+}
+.pay-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 1.1em;
+}
+.pay-row label {
+  margin-right: 12px;
+}
+.pay-row input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  font-size: 1.1em;
+}
+.pay-change strong {
+  font-size: 1.5em;
+}
+.pay-change.negative strong {
+  color: var(--red);
+}
+.pay-footer {
+  padding: 20px;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+}
+.pay-footer button {
+  padding: 22px;
+  font-size: 1.5em;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  font-weight: bold;
+  min-width: 160px;
+}
+.pay-footer .cancel {
+  background: #ddd;
+  color: #333;
+}
+.pay-footer .confirm {
+  background: var(--green);
+  color: white;
+}
+
+/* Order meta (order number / type / channel) */
+.order-meta {
+  flex: 0 0 auto;
+}
+
+/* ✅ this MUST be present */
+#order-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.order-meta-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  gap: 10px;
+}
+.order-meta-row label {
+  width: 80px;
+  color: #555;
+  white-space: nowrap;
+}
+.order-meta-row input,
+.order-meta-row select {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 0.9em;
+}
+
+/* Kitchen / Bar ticket layout */
+.ticket-grid {
+  padding: 16px;
+  background: #f0f2f5;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+/* Kitchen & Bar views fill remaining height and scroll */
+#kitchen-view,
+#bar-view,
+#all-orders-view,
+#admin-view {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.ticket {
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 14px 16px;
+}
+/* ⭐ Ticket header layout */
+.ticket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+/* 🔴 BIG + CLEAR table number */
+.ticket-table {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* space between title, badge, button */
+  font-size: 28px; /* adjust to taste */
+  font-weight: bold;
+}
+
+/* 🔵 Right-side details */
+.ticket-meta {
+  text-align: right;
+}
+
+/* 🟡 Make order number subtle */
+.order-number {
+  font-size: 12px;
+  color: #777;
+  line-height: 1.2;
+}
+
+/* ⏰ Time readable */
+.ticket-time {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* 🟣 badges stay small + pill-shaped */
+.ticket-header .badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.8em;
+  background: #f1f3f5;
+}
+
+.ticket-body {
+  font-size: 1.1em;
+}
+
+/* Special backgrounds for delivery services */
+.ticket-deliveroo {
+  background: #e0f7f5; /* light turquoise, still easy to read text */
+}
+
+.ticket-justeat {
+  background: #ffe8d8; /* light orange, not too strong */
+}
+
+/* Special backgrounds for onsite and tel orders */
+.ticket-takeaway {
+  background: #ffffe0; /* light yellow */
+}
+
+.ticket-phone {
+  background: #ffffe0; /* light yellow */
+}
+
+/* Retrieve button in All orders */
+.retrieve-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #1976d2;
+  background: #e3f2fd;
+  cursor: pointer;
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+
+/* Pay button styled like Retrieve */
+.pay-pending-btn {
+  margin-left: 12px;
+  padding: 8px 16px;
+  font-size: 0.9em;
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  background: #f8f9fa;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pay-pending-btn:active {
+  transform: translateY(1px);
+}
+
+.ticket-item {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticket-item-main {
+  flex: 1;
+}
+
+.ticket-item.done .ticket-item-name,
+.ticket-item.done .ticket-mods {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.ticket-status-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  background: #f8f9fa;
+  cursor: pointer;
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+
+.ticket-status-btn.done {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+  font-weight: bold;
+}
+
+.retrieve-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #007bff;
+  background: #e7f1ff;
+  cursor: pointer;
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+
+.ticket-item-name {
+  font-weight: 600;
+}
+.ticket-mods {
+  font-size: 0.9em;
+  color: #666;
+}
+
+.ticket-item-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.export-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.cash-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.preset-btn {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  background: #f5f6f7;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.preset-btn:active {
+  transform: translateY(1px);
+}
+
+.badge-pending {
+  background: #fff3cd;
+  border: 1px solid #ffeeba;
+}
+.badge-paid {
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+}
+
+.customer-screen {
+  padding: 18px;
+  background: #fff;
+  height: 100%;
+  overflow-y: auto;
+  font-size: 18px;
+}
+.customer-title {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.customer-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  color: #333;
+}
+.customer-pill {
+  border: 1px solid #e5e5e5;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #fafafa;
+}
+.customer-card {
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fafafa;
+}
+.customer-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #ddd;
+}
+.customer-item:last-child {
+  border-bottom: none;
+}
+.customer-mods {
+  font-size: 0.95em;
+  color: #444;
+  margin-top: 4px;
+}
+.customer-total {
+  font-size: 22px;
+  font-weight: 900;
+  margin-top: 14px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Tablet readability boost */
+#kitchen-view,
+#bar-view,
+#all-orders-view {
+  font-size: 120%;
+}
+
+.ticket-status-btn,
+.retrieve-btn,
+.pay-pending-btn {
+  font-size: 1em;
+  padding: 10px 14px;
+}
+
+.order-footer {
+  flex: 0 0 auto;
+}
+
+/* ===== Waitlist ===== */
+
+#waitlist-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.waitlist-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.waitlist-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.waitlist-form input {
+  padding: 8px;
+  font-size: 14px;
+}
+
+.waitlist-list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wait-item {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wait-info {
+  font-size: 14px;
+}
+
+.wait-actions button {
+  margin-left: 6px;
+}
+
+/* =========================
+   WAITLIST (Screenshot style)
+   ========================= */
+
+:root {
+  --wl-navy: #0b0f47;
+  --wl-cream: #f4f1ea;
+  --wl-gold: #c99500;
+  --wl-green: #0b3a2f;
+  --wl-border: #d8caa3;
+  --wl-text: #1b1b1b;
+}
+
+#waitlist-view {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--wl-cream);
+}
+
+/* Page shell */
+.wl-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  box-sizing: border-box;
+}
+
+.wl-hero {
+  background: var(--wl-cream);
+  color: #000;
+  border-radius: 18px 18px 0 0;
+  padding: 18px 18px;
+}
+
+.wl-hero-title {
+  font-size: 30px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.wl-hero-title span {
+  font-weight: 700;
+  margin-left: 10px;
+}
+
+.wl-body {
+  background: var(--wl-cream);
+  border-radius: 0 0 18px 18px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* Form */
+.wl-form {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr 180px;
+  gap: 14px;
+  align-items: end;
+}
+
+.wl-field label {
+  display: block;
+  font-weight: 800;
+  color: var(--wl-text);
+  margin-bottom: 8px;
+}
+
+.wl-field label span {
+  font-weight: 700;
+  margin-left: 8px;
+}
+
+.wl-field input,
+.wl-field select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 2px solid var(--wl-gold);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 16px;
+  background: #fff;
+  outline: none;
+}
+
+.wl-field input:focus,
+.wl-field select:focus {
+  box-shadow: 0 0 0 3px rgba(201, 149, 0, 0.18);
+}
+
+.wl-confirm-btn {
+  height: 48px;
+  border: none;
+  border-radius: 10px;
+  background: var(--wl-gold);
+  color: #fff;
+  font-weight: 900;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.wl-confirm-btn:active {
+  transform: translateY(1px);
+}
+
+/* Counter card */
+.wl-count-card {
+  background: var(--wl-navy);
+  color: #fff;
+  border-radius: 16px;
+  padding: 18px;
+  text-align: center;
+}
+
+.wl-count-number {
+  font-size: 54px;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.wl-count-label {
+  font-size: 16px;
+  font-weight: 800;
+  opacity: 0.95;
+}
+
+.wl-count-label span {
+  font-weight: 800;
+  margin-left: 8px;
+  opacity: 0.95;
+}
+
+/* Table */
+.wl-table-wrap {
+  background: #fff;
+  border: 2px solid var(--wl-border);
+  border-radius: 14px;
+  overflow-y: auto; /* ✅ scroll here */
+  max-height: 420px; /* adjust for tablet */
+}
+
+.wl-table {
+  width: 100%;
+  table-layout: fixed; /* ✅ lock column widths */
+  border-collapse: collapse;
+}
+
+.wl-table thead th {
+  background: var(--wl-green);
+  color: #fff;
+  padding: 14px 12px;
+  font-size: 16px;
+  font-weight: 900;
+  text-align: left;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  white-space: nowrap; /* ✅ keep 中文 + English on one line */
+  font-size: 15px; /* ✅ slightly smaller so it fits nicely */
+}
+
+.wl-table thead th span {
+  display: inline;
+  white-space: nowrap;
+  margin-left: 6px;
+  font-weight: 800;
+  opacity: 0.95;
+}
+
+.wl-table tbody td {
+  padding: 14px 12px;
+  border-top: 1px solid #eee;
+  font-size: 16px;
+  color: var(--wl-text);
+  vertical-align: middle;
+}
+
+.wl-pos {
+  font-weight: 900;
+}
+
+.wl-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wl-btn {
+  border: 1px solid #d0d0d0;
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.wl-btn-seat {
+  border-color: #b7c4bf;
+}
+
+.wl-btn-remove {
+  border-color: #d7b1b1;
+}
+
+.wl-empty {
+  padding: 34px 18px;
+  text-align: center;
+  background: #fff;
+}
+
+.wl-empty-title {
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--wl-green);
+  margin-bottom: 8px;
+}
+
+.wl-empty-sub {
+  font-size: 18px;
+  color: var(--wl-navy);
+  font-weight: 700;
+}
+
+.wl-table th,
+.wl-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wl-table td:nth-child(1),
+.wl-table td:nth-child(3) {
+  font-weight: 700;
+}
+
+.wl-table td:nth-child(3),
+.wl-table th:nth-child(3) {
+  text-align: center; /* Party size aligned */
+}
+
+.wl-table td:nth-child(4),
+.wl-table th:nth-child(4) {
+  text-align: center; /* Wait time aligned */
+}
+
+/* ===== Order review popup (Payment button) ===== */
+
+#review-modal {
+  position: fixed;
+  inset: 0; /* top:0; right:0; bottom:0; left:0 */
+  background: rgba(0, 0, 0, 0.8); /* dark backdrop */
+  display: none; /* hidden by default */
+  align-items: center;
+  justify-content: center;
+  z-index: 120; /* above pay-modal (110) */
+}
+
+.review-box {
+  background: #fff;
+  border-radius: 22px;
+  width: 95%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto; /* scroll if there are many items */
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.4em;
+  font-weight: 700;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+}
+
+.review-close {
+  border: none;
+  background: none;
+  font-size: 1.6em;
+  cursor: pointer;
+}
+
+/* Make the contents larger for reading out loud */
+.review-body {
+  font-size: 1.2em;
+}
+
+/* Optional: if you want the customer-style layout even bigger in the popup */
+.review-body .customer-title {
+  font-size: 30px;
+}
+
+.review-body .customer-item {
+  font-size: 1.1em;
+}
+
+/* ===== Payment buttons INSIDE popup ===== */
+
+.review-pay-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* Match your POS button style but smaller */
+.review-pay-buttons .pay-btn {
+  padding: 10px 14px;
+  font-size: 1em;
+  border-radius: 14px;
+  font-weight: bold;
+}
+
+/* Style match your existing ones */
+.review-btn-card {
+  background: #c99500;
+  color: #000000;
+  border: none;
+}
+
+.review-btn-cash {
+  background: #c99500;
+  color: #000000;
+  border: none;
+}
+
+.admin-item-sales-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.ais-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f6f7f8;
+}
+
+.ais-name {
+  font-weight: 600;
+}
+
+.ais-qty {
+  font-weight: 800;
+}
+
+/* Container */
+.table-selector {
+  width: 100%;
+}
+
+/* One single row, equal-width buttons */
+.table-buttons {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+/* Buttons */
+.table-btn {
+  padding: 10px 0;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #f7f7f7;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+/* Hover feedback */
+.table-btn:hover {
+  background: #eee;
+}
+
+/* Selected table button */
+.table-btn.active {
+  border-color: #000;
+  background: #ffe66d;
+  font-weight: 700;
+}
+
+.table-btn.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ⭐ In Kitchen + Bar, stack title + pickup vertically and align left */
+#kitchen-view .ticket-table,
+#bar-view .ticket-table {
+  flex-direction: column; /* title on top, pickup under */
+  align-items: flex-start; /* left-align the text */
+}
+
+/* main title (TABLE 3 / Deliveroo etc.) */
+.ticket-table-main {
+  font-weight: 700;
+}
+
+/* new pickup tag under the title */
+.ticket-pickup {
+  font-size: 20px; /* smaller than big title */
+  margin-top: 4px; /* little gap under title */
+  opacity: 0.8; /* slightly softer */
+  color: var(--red);
+  /* optional pill style:
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f0f0f0;
+  */
+}
+
+/* ⭐ In All-orders, also stack title + pickup vertically */
+#all-orders .ticket-table {
+  display: flex; /* ensure it's flex */
+  flex-direction: column; /* title row + pickup row */
+  align-items: flex-start;
+}
+
+/* first row: title + Pay button side-by-side */
+.ticket-table-main-row {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* space between title + Pay button */
+}
+
+/* reuse same visual style as Kitchen/Bar for pickup */
+#all-orders .ticket-pickup {
+  font-size: 20px;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
+/* dark overlay */
+#card-pending-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none; /* JS will switch to flex */
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* white box */
+.card-pending-box {
+  background: #fff;
+  padding: 16px;
+  width: 360px;
+  max-width: 90%;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* title row */
+.card-pending-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: bold;
+}
+
+/* X button */
+.card-pending-close {
+  border: none;
+  background: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+/* main body text */
+.card-pending-body {
+  margin-bottom: 16px;
+}
+
+/* total amount */
+.card-pending-amount {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+/* full-width confirm button */
+.card-pending-confirm {
+  width: 100%;
+}
+
+/* Better keep all @media at the bottom */
+@media (max-width: 900px) {
+  .main {
+    flex-direction: column;
+  }
+  .right {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #ddd;
+  }
+}
+/* Responsive: tablet portrait */
+@media (max-width: 900px) {
+  .wl-form {
+    grid-template-columns: 1fr;
+  }
+  .wl-confirm-btn {
+    width: 100%;
+  }
+  .wl-table tbody {
+    max-height: 260px;
+  }
+}
+/* Tablet touch devices only (visual polish, optional) */
+@media (pointer: coarse) {
+  .ticket {
+    font-size: 120%;
+  }
+  .pay-btn {
+    font-size: 1.05em;
+  }
+}
