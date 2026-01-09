@@ -377,12 +377,12 @@
       <div class="pay-head">Payment</div>
       <div class="pay-body">
         <div class="pay-row">
-          <span>Amount due:</span>
+          <span>現金折扣後</span>
           <strong id="amount-due">£0.00</strong>
         </div>
 
         <div class="pay-row">
-          <label for="amount-received">Cash received:</label>
+          <label for="amount-received">收取現金:</label>
           <input type="number" id="amount-received" step="0.01" min="0" />
         </div>
         <!-- QUICK CASH PRESETS (ADD THIS) -->
@@ -391,11 +391,12 @@
          <button type="button" class="preset-btn" data-val="10">£10</button>
          <button type="button" class="preset-btn" data-val="20">£20</button>
          <button type="button" class="preset-btn" data-val="30">£30</button>
+         <button type="button" class="preset-btn" data-val="40">£40</button>
          <button type="button" class="preset-btn" data-val="50">£50</button>
         </div>
 
         <div class="pay-row pay-change">
-          <span>Change:</span>
+          <span>找續:</span>
           <strong id="change-amount">£0.00</strong>
         </div>
       </div>
@@ -434,7 +435,7 @@ const menu = [
   // 飲品
   { name:"奶茶", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","milktea-opts"], hotCold:true },
   { name:"檸茶", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts", "lemon-opts"], hotCold:true },
-  { name:"檸水", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts"], hotCold:true },
+  { name:"檸水", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts", "lemon-opts"], hotCold:true },
   { name:"粒粒椰汁紅豆冰", price:4.0, cat:"飲品", optionGroups:["redbean-opts"], hotCold:false },
   { name:"好立克", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
   { name:"阿華田", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
@@ -457,7 +458,7 @@ const menu = [
 
   // Others
   { name:"炒蛋多士", price:2.0, cat:"Others", optionGroups:[], hotCold:false },
-  { name:"生雲吞",    price:10.0, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"生雲吞", price:8.0, cat:"Others", optionGroups:[], hotCold:false, excludeFromCashDiscount:true },
   { name:"套餐 -£0.5", price:-0.5, cat:"Others", optionGroups:[], hotCold:false },
   { name:"BB通粉", price:0.0, cat:"Others", optionGroups:[], hotCold:false },
 ];
@@ -508,7 +509,7 @@ function getTodayRangeISO() {
 }
 
 // shape: { ticketId: string, lane: 'food'|'drink', index: number }
-const ADMIN_PASSWORD = '1234'; // change this
+const ADMIN_PASSWORD = '6575';
 
 // === Editing & Direct Add Controls ===
 let editingOrderItemIndex = null;
@@ -693,7 +694,9 @@ function openModal(item, menuIndex) {
     DingName: item.DingName || null,
     cat: item.cat,
     menuIndex: (typeof menuIndex === 'number') ? menuIndex : null,
-    excludeFromComboB: !!item.excludeFromComboB
+    excludeFromComboB: !!item.excludeFromComboB,
+    // ✅ NEW: store flag so it survives the modal flow
+    excludeFromCashDiscount: !!item.excludeFromCashDiscount
   };
 
   const head = document.querySelector('.modal-head');
@@ -901,12 +904,28 @@ function updateOrder() {
   const mealDealDiscount = comboBCount * 1.0 + comboACount * 0.5;
   const baseTotal = subtotal - mealDealDiscount;
 
+  // ----------------------------
+  // Cash discount (exclude certain items, e.g. 生雲吞)
+  // ----------------------------
+
+  // ✅ Reset defaults ONCE
   let cashDiscount = 0;
   let finalTotal = baseTotal;
 
-  if (isCash && baseTotal > 0) {
-    cashDiscount = baseTotal * 0.05;
+  // ✅ total of items that should NOT get cash discount
+  // (we assume item.final already includes its own modifiers)
+  const nonDiscountableSum = order.reduce((sum, it) => {
+    return sum + (it.excludeFromCashDiscount ? Number(it.final || 0) : 0);
+  }, 0);
+
+  // ✅ only apply cash discount to the part that is discountable
+  const discountableBase = Math.max(0, baseTotal - nonDiscountableSum);
+
+  if (isCash && discountableBase > 0) {
+    cashDiscount = discountableBase * 0.05;
     finalTotal = baseTotal - cashDiscount;
+
+    // keep your rounding rule (1 decimal, round down)
     finalTotal = Math.floor(finalTotal * 10) / 10;
   }
 
@@ -1077,7 +1096,9 @@ document.getElementById('add').addEventListener('click', () => {
     swapToPork,
     cat: current.cat,
     menuIndex: (typeof current.menuIndex === 'number') ? current.menuIndex : null,
-    excludeFromComboB: !!current.excludeFromComboB
+    excludeFromComboB: !!current.excludeFromComboB,
+    // ✅ NEW: keep this flag on the order line so cash discount can exclude it
+   excludeFromCashDiscount: !!current.excludeFromCashDiscount
   };
 
   // ✅ If editing an All Orders ticket item, save back into that ticket instead of POS order[]
@@ -1171,6 +1192,9 @@ document.getElementById('menu-content').addEventListener('click', e => {
       mods: [],
       cat: item.cat,
       menuIndex: index,
+      // ✅ NEW: carry menu flag into this order line
+      // If true, this item will NOT get the 5% cash discount
+      excludeFromCashDiscount: !!item.excludeFromCashDiscount
     });
     updateOrder();
   } else {
@@ -1374,15 +1398,32 @@ function syncUnpaidBtnState() {
   unpaidBtn.style.opacity = on ? '1' : '0.5';
 }
 
+function syncPaymentBtnState() {
+  if (!paymentBtn || !orderTypeSelect) return;
+
+  const type = orderTypeSelect.value;
+
+  const isPlatform = (type === 'deliveroo' || type === 'justeat');
+
+  // Disable for platform orders
+  paymentBtn.disabled = isPlatform;
+
+  // Visual feedback
+  paymentBtn.style.opacity = isPlatform ? '0.5' : '1';
+  paymentBtn.style.cursor  = isPlatform ? 'not-allowed' : 'pointer';
+}
+
 // ✅ Initial state (run AFTER unpaidBtn exists)
 syncUnpaidBtnState();
 syncPlatformBtnState();
+syncPaymentBtnState();
 
 // make sure both Add + Unpaid update when type changes
 if (orderTypeSelect) {
   orderTypeSelect.addEventListener('change', () => {
     syncPlatformBtnState();
     syncUnpaidBtnState();
+    syncPaymentBtnState();
   });
 }
 syncUnpaidBtnState();
@@ -1681,7 +1722,7 @@ function finalizeOrder(paymentMethod, overrideTotal = null) {
   });
   const orderId   = now.getTime();
 
-  const foodCats = ['咖喱系列', '茶記粉面', '主食', '小食'];
+  const foodCats = ['咖喱系列', '茶記粉面', '主食', '小食', 'Others'];
 
   const foodItems = order
     .filter(item => foodCats.includes(item.cat))
@@ -2304,7 +2345,7 @@ function bucketFromCategory(cat) {
   const c = String(cat || '');
   if (c.includes('飲品')) return 'drink';
   if (c.includes('小食')) return 'snack';
-  if (!c) return 'other';
+  if (c === 'Others' || c.toLowerCase().includes('other')) return 'other';
   return 'food';
 }
 
@@ -2906,7 +2947,7 @@ function createUnpaidTicketFromCurrentOrder() {
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   const orderId = now.getTime();
 
-  const foodCats = ['咖喱系列', '茶記粉面', '主食', '小食'];
+  const foodCats = ['咖喱系列', '茶記粉面', '主食', '小食', 'Others'];
 
   const foodItems = order
     .filter(item => foodCats.includes(item.cat))

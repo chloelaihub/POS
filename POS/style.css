@@ -444,11 +444,24 @@ body{
     font-size:1.1em;
   }
   .pay-change strong{
-    font-size:1.5em;
+    font-size:2.0em;
+    color: red;
   }
   .pay-change.negative strong{
     color:var(--red);
   }
+
+  .pay-row span {
+  font-size: 1.1em;
+  color: #666;
+  }
+
+  #amount-due {
+  font-size: 2.0em;
+  font-weight: bold;
+  color: #000;
+  }
+
   .pay-footer {
     padding: 20px;
     background: #f8f9fa;
