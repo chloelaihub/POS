@@ -1,0 +1,3561 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>獅子山 Lion Rock POS</title>
+<link rel="stylesheet" href="styledev.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<!-- Supabase: load client & expose `supabaseClient` for the POS script -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script>
+      // NOTE: This anon key is safe to use in the browser. Do not put your service role key here.
+      const supabaseUrl = 'https://thmsnrncktwoajgclywa.supabase.co';
+      const supabaseKey = 'sb_publishable_M1wpHSIK_pE55Y7-MBgSmQ_CRs0oj2C';
+      const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+    </script>
+</head>
+<body>
+  <!-- Top tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="pos-view">落單</button>
+    <button class="tab" data-tab="kitchen-view">廚房</button>
+    <button class="tab" data-tab="bar-view">水吧</button>
+    <button class="tab" data-tab="all-orders-view">全部訂單</button>
+    <button class="tab" data-tab="customer-view">Customer View</button>
+    <button class="tab" data-tab="waitlist-view">等位</button>
+    <button class="tab" data-tab="admin-view">Admin</button>
+  </div>
+
+  <!-- POS view -->
+  <div id="pos-view">
+    <div class="main">
+      <div class="left" id="menu-content"></div>
+
+      <div class="right">
+        <!-- Order meta (order #, service, channel) -->
+        <div class="order-meta">
+         <!-- Table number (we keep the same id so JS still works) -->
+          <div class="order-meta-row">
+           <label>Table #</label>
+          <div class="table-selector">
+            <div class="table-buttons">
+              <button type="button" class="table-btn" data-table="1">1</button>
+              <button type="button" class="table-btn" data-table="2">2</button>
+              <button type="button" class="table-btn" data-table="3">3</button>
+              <button type="button" class="table-btn" data-table="4">4</button>
+              <button type="button" class="table-btn" data-table="5">5</button>
+              <button type="button" class="table-btn" data-table="6">6</button>
+              <button type="button" class="table-btn" data-table="7">7</button>
+              <button type="button" class="table-btn" data-table="8">8</button>
+            </div>
+
+            <!-- Hidden field so existing JS that reads #order-number still works -->
+            <input id="order-number" type="hidden" />
+          </div>
+        </div>
+
+     <div class="order-meta-row">
+        <label for="order-type">Type</label>
+        <select id="order-type">
+         <option value="dine-in">堂食</option>
+        <option value="takeaway">現場外賣</option>
+        <option value="phone">電話外賣</option>
+        <option value="deliveroo">Deliveroo</option>
+        <option value="justeat">Just Eat</option>
+      </select>
+    </div>
+
+    <!-- Expected pickup time -->
+    <div class="order-meta-row">
+      <label for="pickup-time">Pickup</label>
+      <input id="pickup-time" type="time" step="60" />
+    </div>
+  </div>
+
+        <!-- Order summary -->
+        <h2 style="font-size:1.8em;color:var(--green);margin-bottom:18px;">Order Summary</h2>
+        <div id="order-list">
+          <p class="empty-order">No items yet</p>
+        </div>
+
+        <!-- Discounts + total + Pay -->
+        <div id="discount-summary" style="text-align:right; color:#d32f2f; font-weight:bold;"></div>
+        <div class="total">
+          <span>Total <span id="total">£0.00</span></span>
+        </div>
+
+        <!-- Card, Cash, Add, Unpaid pay buttons -->
+       <div class="order-footer">
+        <div class="pay-buttons">
+         <button class="pay-btn" id="payment-view-btn" type="button">Payment</button>
+         <button class="pay-btn" id="card-btn" type="button">Card</button>
+         <button class="pay-btn pay-cash" id="pay-btn" type="button">Cash</button>
+         <button class="pay-btn" id="platform-btn" type="button">Add</button>
+         <button class="pay-btn" id="unpaid-btn" type="button">Unpaid</button>
+       </div>
+      </div>
+    </div>
+  </div>
+ </div>
+
+  <!-- Kitchen view (for food items) -->
+  <div id="kitchen-view" style="display:none;">
+    <div id="kitchen-orders" class="ticket-grid"></div>
+  </div>
+
+  <!-- Bar view (for drinks) -->
+  <div id="bar-view" style="display:none;">
+    <div id="bar-orders" class="ticket-grid"></div>
+  </div>
+
+  <!-- All orders view (combined food + drinks) -->
+  <div id="all-orders-view" style="display:none;">
+    <div style="display:flex;justify-content:flex-end;align-items:center;padding:8px 16px;background:#f0f2f5;">
+  </div>
+
+  <div id="all-orders" class="ticket-grid"></div>
+</div>
+
+<!-- Customer view -->
+<div id="customer-view" style="display:none;">
+  <div id="customer-screen" class="customer-screen"></div>
+</div>
+
+<!-- Waitlist view -->
+<div id="waitlist-view" style="display:none;">
+  <div class="wl-page">
+
+    <div class="wl-hero">
+      <div class="wl-hero-title">登記候位表 <span>Restaurant Waitlist</span></div>
+    </div>
+
+    <div class="wl-body">
+
+      <!-- Form row -->
+      <div class="wl-form">
+        <div class="wl-field">
+          <label>姓名 <span>Customer Name</span></label>
+          <input id="wait-name" type="text" placeholder="輸入 Enter customer name" />
+        </div>
+
+        <div class="wl-field">
+          <label>人數 <span>Party Size</span></label>
+          <select id="wait-pax">
+            <option value="">選擇 Select size</option>
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+            <option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
+          </select>
+        </div>
+
+        <button id="add-wait-btn" class="wl-confirm-btn" type="button">確認 Confirm</button>
+      </div>
+
+      <!-- Big counter card -->
+      <div class="wl-count-card">
+        <div class="wl-count-number" id="wl-count">0</div>
+        <div class="wl-count-label">等待人數 <span>Parties Waiting</span></div>
+      </div>
+
+      <!-- Table -->
+      <div class="wl-table-wrap">
+        <table class="wl-table">
+         <colgroup>
+           <col style="width:20%">
+           <col style="width:20%">
+           <col style="width:20%">
+           <col style="width:20%">
+           <col style="width:20%">
+         </colgroup>
+          <thead>
+            <tr>
+              <th>號碼 POSITION</th>
+              <th>姓名 CUSTOMER NAME</th>
+              <th>人數 PARTY SIZE</th>
+              <th>等待時間 WAIT TIME</th>
+              <th>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody id="waitlist-tbody">
+            <!-- rows injected by JS -->
+          </tbody>
+        </table>
+
+        <!-- Empty state -->
+        <div id="wl-empty" class="wl-empty" style="display:none;">
+          <div class="wl-empty-title">No customers waiting</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ================= PAYMENT ORDER VIEW MODAL ================= -->
+<div id="payment-modal" class="modal hidden">
+  <div class="modal-inner payment-modal">
+
+    <!-- LEFT SIDE — order summary -->
+    <div class="payment-left">
+      <h2>Order Summary</h2>
+      <div id="payment-order-summary"></div>
+    </div>
+
+    <!-- RIGHT SIDE — payment controls -->
+    <div class="payment-right">
+
+      <!-- Card / Cash toggle -->
+      <div class="payment-method-toggle">
+        <button type="button" id="pay-method-card">Card</button>
+        <button type="button" id="pay-method-cash">Cash</button>
+      </div>
+
+      <!-- Payment panel area -->
+      <div class="payment-panel">
+
+        <!-- Card mode -->
+        <div id="payment-card-panel">
+          <p>Take card payment on the terminal.</p>
+          <p>Once approved, press Confirm below.</p>
+        </div>
+
+        <!-- Cash mode -->
+        <div id="payment-cash-panel" class="hidden">
+          <p><strong>Cash calculator</strong></p>
+          <p>Total due: £<span id="cash-total-due">0.00</span></p>
+          <p>
+            Amount given:
+            <input id="cash-given" type="number" step="0.01">
+          </p>
+          <p>
+            Change:
+            £<span id="cash-change">0.00</span>
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Confirm -->
+      <button type="button" id="payment-confirm-btn" class="confirm-btn" disabled>
+        Confirm
+      </button>
+
+    </div>
+  </div>
+</div>
+<!-- ================= END PAYMENT MODAL ================= -->
+
+<!-- Admin view -->
+<div id="admin-view" style="display:none;">
+  <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;background:#f0f2f5;border-bottom:1px solid #ddd;">
+    <div style="display:flex;gap:10px;align-items:center;">
+      <strong>Daily Sales</strong>
+    </div>
+    <button id="export-csv-btn" type="button" class="export-btn">Export CSV</button>
+  </div>
+
+  <div id="admin-summary" style="padding:16px;"></div>
+</div>
+
+  <!-- Options modal -->
+  <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+      <div class="modal-head" id="modal-title">選擇選項</div>
+      <div class="modal-body">
+        <!-- (all your opts groups – unchanged) -->
+        <!-- 熱 / 凍 -->
+        <div class="opts" id="hot-cold-opts" style="display:none;">
+          <div class="opt">熱</div>
+          <div class="opt">凍</div>
+        </div>
+
+        <!-- 粒粒椰汁紅豆冰 -->
+        <div class="opts" id="redbean-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div>
+          <div class="opt">少椰奶</div><div class="opt">少花奶</div>
+          <div class="opt">走椰奶</div><div class="opt">走花奶</div>
+        </div>
+
+        <!-- 好立克 & 阿華田 -->
+        <div class="opts" id="ovaltine-horlicks-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div><div class="opt">煉奶</div><div class="opt">少甜</div>
+        </div>
+
+        <!-- 檸茶 & 檸水 -->
+        <div class="opts" id="lemon-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div>
+        </div>
+
+        <!-- 柚子薑蜜 -->
+        <div class="opts" id="citron-opts" style="display:none;">
+          <div class="opt">凍</div><div class="opt">少冰</div><div class="opt">走冰</div>
+        </div>
+
+        <!-- 奶茶專用 -->
+        <div class="opts" id="milktea-opts" style="display:none;">
+          <div class="opt">少花奶</div><div class="opt">多花奶</div><div class="opt">英國版</div>
+          <div class="opt">少冰</div><div class="opt">走冰</div><div class="opt">冰底</div>
+          <div class="opt">煉奶</div><div class="opt">少甜</div>
+        </div>
+
+        <!-- 咖啡專用 -->
+        <div class="opts" id="coffee-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div>
+          <div class="opt">牛奶</div><div class="opt">花奶</div><div class="opt">少奶</div><div class="opt">煉奶</div><div class="opt">少甜</div>
+        </div>
+
+        <!-- 鴛鴦專用 -->
+        <div class="opts" id="yuenyeung-opts" style="display:none;">
+          <div class="opt">少冰</div><div class="opt">走冰</div>
+          <div class="opt">少花奶</div><div class="opt">煉奶</div><div class="opt">少甜</div>
+        </div>
+
+        <!-- 西多士專用 -->
+        <div class="opts" id="french-toast-opts" style="display:none;">
+          <div class="opt">煉奶</div>
+        </div>
+
+        <!-- 主食選項 -->
+        <div class="opts" id="brisket-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">撈粗</div><div class="opt">撈拉麵</div><div class="opt">撈丁</div><div class="opt">湯粗</div><div class="opt">湯拉麵</div><div class="opt">湯丁</div>
+          <div class="opt">淨牛腩</div><div class="opt">淨牛筋</div><div class="opt">多牛腩</div><div class="opt">多牛筋</div><div class="opt">少牛腩</div><div class="opt">少牛筋</div><div class="opt">走乾蒜</div>
+        </div>
+        <div class="opts" id="tomato-baked-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div><div class="opt">多菠蘿</div>
+          <div class="opt">走菠蘿</div><div class="opt">轉雞扒</div><div class="opt">多芝士</div><div class="opt">少芝士</div><div class="opt">走芝士</div><div class="opt">免焗</div>
+        </div>
+        <div class="opts" id="portuguese-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div>
+          <div class="opt">轉豬扒</div>
+          <div class="opt">多芝士</div><div class="opt">少芝士</div><div class="opt">走芝士</div><div class="opt">免焗</div>
+        </div>
+        <div class="opts" id="charsiu-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">煎熟蛋</div><div class="opt">撈粗</div><div class="opt">走乾蒜</div>
+        </div>
+        <div class="opts" id="kimchi-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div>
+          <div class="opt">多泡菜</div><div class="opt">少泡菜</div><div class="opt">走泡菜</div><div class="opt">走乾蒜</div>
+        </div>
+        <div class="opts" id="basic-rice-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div>
+        </div>
+        <div class="opts" id="plain-curry-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">多薯仔</div><div class="opt">少薯仔</div>
+          <div class="opt">走薯仔</div><div class="opt">走乾蒜</div>
+        </div>
+        <div class="opts" id="baked-curry-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div><div class="opt">多薯仔</div>
+          <div class="opt">少薯仔</div><div class="opt">走薯仔</div>
+          <div class="opt">多芝士</div><div class="opt">少芝士</div><div class="opt">走芝士</div><div class="opt">免焗</div>
+        </div>
+        <div class="opts" id="spring-onion-opts" style="display:none;">
+          <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">撈丁</div><div class="opt">撈粗</div>
+          <div class="opt">撈拉麵</div><div class="opt">湯米</div><div class="opt">湯通</div><div class="opt">湯意</div>
+          <div class="opt">多蔥油</div><div class="opt">少蔥油</div><div class="opt">煎熟蛋</div><div class="opt">走乾蒜</div>
+        </div>
+        <div class="opts" id="chakee-noodles-opts" style="display:none;">
+          <div class="opt">丁</div><div class="opt">湯米</div><div class="opt">湯通</div><div class="opt">湯意</div>
+          <div class="opt">湯粗</div><div class="opt">湯拉麵</div>
+          <div class="opt">太陽蛋</div><div class="opt">煎熟蛋</div><div class="opt">炒熟蛋</div>
+          <div class="opt">走包</div><div class="opt">包走牛油</div><div class="opt">包少牛油</div><div class="opt">包多牛油</div><div class="opt">包唔烘</div><div class="opt">包烘耐啲</div>
+        </div>
+
+        <!-- 茶記粉面 - 餐 -->
+        <div class="opts" id="set-meal-opts" style="display:none;">
+          <div class="opt">餐</div>
+        </div>
+
+        <!-- Global options (all items) -->
+         <div class="opts" id="global-opts" style="display:none;">
+         <div class="opt">外賣</div>
+         <div class="opt">後上</div>
+        </div>
+
+        <textarea placeholder="特別要求..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="cancel" id="cancel">Cancel</button>
+        <button class="confirm" id="add">Add to Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment modal -->
+  <div id="pay-modal">
+    <div class="pay-box">
+      <div class="pay-head">Payment</div>
+      <div class="pay-body">
+        <div class="pay-row">
+          <span>Amount due:</span>
+          <strong id="amount-due">£0.00</strong>
+        </div>
+
+        <div class="pay-row">
+          <label for="amount-received">Cash received:</label>
+          <input type="number" id="amount-received" step="0.01" min="0" />
+        </div>
+        <!-- QUICK CASH PRESETS (ADD THIS) -->
+        <div class="cash-presets">
+         <button type="button" class="preset-btn" data-val="exact">Exact</button>
+         <button type="button" class="preset-btn" data-val="10">£10</button>
+         <button type="button" class="preset-btn" data-val="20">£20</button>
+         <button type="button" class="preset-btn" data-val="30">£30</button>
+         <button type="button" class="preset-btn" data-val="50">£50</button>
+        </div>
+
+        <div class="pay-row pay-change">
+          <span>Change:</span>
+          <strong id="change-amount">£0.00</strong>
+        </div>
+      </div>
+      <div class="pay-footer">
+        <button type="button" id="pay-cancel" class="cancel">Cancel</button>
+        <button type="button" id="pay-confirm" class="confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const menu = [
+  // 主食 & 咖喱系列
+  { name:"咖喱雞扒飯", price:11.8, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false },
+  { name:"咖喱豬扒飯", price:11.8, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false },
+  { name:"咖喱牛腩飯", price:12.3, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false },
+  { name:"焗咖喱雞扒飯", price:12.8, cat:"咖喱系列", optionGroups:["baked-curry-opts"], hotCold:false },
+  { name:"焗咖喱豬扒飯", price:12.8, cat:"咖喱系列", optionGroups:["baked-curry-opts"], hotCold:false },
+  { name:"焗咖喱牛腩飯", price:13.3, cat:"咖喱系列", optionGroups:["baked-curry-opts"], hotCold:false },
+
+  { name:"沙嗲牛肉", price:8.9, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "沙嗲牛肉丁", SoupVermicelliName:"沙嗲牛肉湯米", SoupMacaroniName:"沙嗲牛肉湯通", SoupSpaghettiName:"沙嗲牛肉湯意", SoupMeinName:"沙嗲牛肉湯粗", SoupRamenName:"沙嗲牛肉湯拉麵"},
+  { name:"雪菜肉絲", price:8.4, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "雪菜肉絲丁", SoupVermicelliName:"雪菜肉絲湯米", SoupMacaroniName:"雪菜肉絲湯通", SoupSpaghettiName:"雪菜肉絲湯意", SoupMeinName:"雪菜肉絲湯粗", SoupRamenName:"雪菜肉絲湯拉麵" },
+  { name:"叉燒", price:8.4, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "叉燒丁", SoupVermicelliName:"叉燒湯米", SoupMacaroniName:"叉燒湯通", SoupSpaghettiName:"叉燒湯意", SoupMeinName:"叉燒湯粗", SoupRamenName:"叉燒湯拉麵" },
+  { name:"五香肉丁", price:8.4, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "五香肉丁", SoupVermicelliName:"五香肉丁湯米", SoupMacaroniName:"五香肉丁湯通", SoupSpaghettiName:"五香肉丁湯意", SoupMeinName:"五香肉丁湯粗", SoupRamenName:"五香肉丁湯拉麵" },
+  { name:"火腿", price:7.9, cat:"茶記粉面", optionGroups:["chakee-noodles-opts","set-meal-opts"], hotCold:false, DingName: "火腿丁", SoupVermicelliName:"火腿湯米", SoupMacaroniName:"火腿湯通", SoupSpaghettiName:"火腿湯意", SoupMeinName:"火腿湯粗", SoupRamenName:"火腿湯拉麵" },
+
+  { name:"柱侯牛腩飯", price:11.8, cat:"主食", optionGroups:["brisket-opts"], hotCold:false, loMeinName:"柱侯牛筋腩撈粗", loRamenName:"柱侯牛腩撈拉麵", loDingName:"柱侯牛腩撈丁", SoupMeinName:"柱侯牛筋腩湯粗", SoupRamenName:"柱侯牛筋腩湯拉麵", SoupDingName:"柱侯牛筋腩湯丁"},
+  { name:"蜜汁叉燒煎蛋飯", price:11.5, cat:"主食", optionGroups:["charsiu-opts"], hotCold:false, loMeinName:"蜜汁叉燒煎蛋撈粗" },
+  { name:"鮮茄焗豬扒飯", price:12.5, cat:"主食", optionGroups:["tomato-baked-opts"], hotCold:false },
+  { name:"葡汁焗雞扒飯", price:12.5, cat:"主食", optionGroups:["portuguese-opts"], hotCold:false },
+  { name:"蔥油雞扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"蔥油雞扒煎蛋撈粗", loRamenName:"蔥油雞扒煎蛋撈拉麵", loDingName:"蔥油雞扒煎蛋撈丁", SoupVermicelliName:"蔥油雞扒煎蛋湯米", SoupMacaroniName:"蔥油雞扒煎蛋湯通", SoupSpaghettiName:"蔥油雞扒煎蛋湯意" },
+  { name:"蔥油豬扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"蔥油豬扒煎蛋撈粗", loRamenName:"蔥油豬扒煎蛋撈拉麵", loDingName:"蔥油豬扒煎蛋撈丁", SoupVermicelliName:"蔥油豬扒煎蛋湯米", SoupMacaroniName:"蔥油豬扒煎蛋湯通", SoupSpaghettiName:"蔥油豬扒煎蛋湯意"  },
+  { name:"泡菜五花腩飯", price:11.5, cat:"主食", optionGroups:["kimchi-opts"], hotCold:false },
+  { name:"滑蛋鰻魚飯", price:13.5, cat:"主食", optionGroups:["basic-rice-opts"], hotCold:false },
+
+  // 飲品
+  { name:"奶茶", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","milktea-opts"], hotCold:true },
+  { name:"粒粒椰汁紅豆冰", price:4.0, cat:"飲品", optionGroups:["redbean-opts"], hotCold:false },
+  { name:"檸茶", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts", "lemon-opts"], hotCold:true },
+  { name:"檸水", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts"], hotCold:true },
+  { name:"凍咸檸七", price:3.5, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"好立克", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
+  { name:"阿華田", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
+  { name:"柚子薑蜜", price:3.0, cat:"飲品", optionGroups:[,"citron-opts"], hotCold:true },
+  { name:"凍檸樂", price:2.5, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"咖啡", price:2.0, cat:"飲品", optionGroups:["hot-cold-opts","coffee-opts"], hotCold:true },
+  { name:"Coke", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"Zero", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"7up", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"鴛鴦", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","yuenyeung-opts"], hotCold:true },
+  { name:"紅茶", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
+
+  // 小食
+  { name:"土匪雞翼", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
+  { name:"鹵水牛展", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
+  { name:"花生醬西多士", price:6.5, cat:"小食", optionGroups:["french-toast-opts"], hotCold:false },
+  { name:"半份西多士", price:4.0, cat:"小食", optionGroups:["french-toast-opts"], hotCold:false },
+  { name:"餃子", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
+
+  // Others
+  { name:"炒蛋多士", price:2.0, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"生雲吞",    price:10.0, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"套餐 -£0.5", price:-0.5, cat:"Others", optionGroups:[], hotCold:false },
+];
+
+let order = [];
+let current = null;
+let isCash = false;
+let lastBaseTotal = 0;
+let lastFinalTotal = 0;
+let lastSubtotal = 0;
+let lastComboACount = 0;
+let lastComboBCount = 0;
+let lastMealDealDiscount = 0;
+let lastCashDiscount = 0;
+let nextOrderId = 1;
+let kitchenOrders = [];
+let completedOrders = [];
+let archivedOrders = [];   // orders that have been fully completed in kitchen/bar
+let payingOrderId = null;   // when paying an existing Unpaid ticket
+let adminUnlocked = false;
+let waitlist = [];
+let editingTicketItem = null;
+// ========= PAYMENT MODAL STATE =========
+// Payment method is chosen inside the popup.
+// Order is NOT finalised until Confirm is clicked.
+let paymentMethod = null; // 'card' or 'cash'
+
+// ----------------------
+// Date helpers: "today" range in ISO for Supabase
+// ----------------------
+// We use the device's local timezone to define the restaurant day,
+// then convert to ISO so Supabase can filter by created_at.
+function getTodayRangeISO() {
+  const now = new Date();
+
+  // Local midnight today (00:00 on this device)
+  const startLocal = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    0, 0, 0, 0
+  );
+
+  // Local midnight tomorrow
+  const endLocal = new Date(startLocal.getTime() + 24 * 60 * 60 * 1000);
+
+  // Convert to ISO (UTC) — Supabase stores timestamptz in UTC
+  return {
+    start: startLocal.toISOString(),
+    end: endLocal.toISOString()
+  };
+}
+
+// shape: { ticketId: string, lane: 'food'|'drink', index: number }
+const ADMIN_PASSWORD = '1234'; // change this
+
+// === Editing & Direct Add Controls ===
+let editingOrderItemIndex = null;
+let pendingItemToAdd = null;
+
+// ===== Device access mode (cashier vs customer tablet) =====
+function getMode() {
+  const params = new URLSearchParams(window.location.search);
+  return (params.get('mode') || '').toLowerCase();
+}
+
+function applyTabAccessMode() {
+  const mode = getMode();
+  if (mode !== 'customer') return;
+
+  // Only allow these TWO views on a customer tablet
+  const allowedViews = new Set(['customer-view', 'waitlist-view']);
+
+  // Hide tab buttons that are not allowed
+  document.querySelectorAll('.tab[data-tab]').forEach(btn => {
+    const viewId = btn.dataset.tab; // e.g. "customer-view"
+    if (!allowedViews.has(viewId)) {
+      btn.style.display = 'none';
+    }
+  });
+
+  // Hide view containers that are not allowed
+  const allViews = [
+    'pos-view',
+    'kitchen-view',
+    'bar-view',
+    'all-orders-view',
+    'customer-view',
+    'waitlist-view',
+    'admin-view'
+  ];
+
+  allViews.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.style.display = allowedViews.has(id) ? 'block' : 'none';
+    if (id === 'pos-view' && allowedViews.has(id)) el.style.display = 'flex';
+  });
+
+  // Force switch to Customer View tab
+  switchToView('customer-view');
+}
+
+const DIRECT_ADD_CATEGORIES = ["咖喱系列", "主食", "小食", "Others"];
+const DIRECT_ADD_DRINKS = [
+  "Coke",
+  "Zero",
+  "7up",
+  "凍檸樂",
+  "凍咸檸七",
+  "柚子薑蜜",
+  "粒粒椰汁紅豆冰",
+  "紅茶",
+  "套餐 -£0.5",
+];
+
+// ----------------------
+// Table selector buttons (1–8)
+// ----------------------
+function initTableButtons() {
+  const tableButtons = document.querySelectorAll('.table-btn');
+  const tableInput   = document.getElementById('order-number');
+
+  if (!tableButtons.length || !tableInput) return;
+
+  tableButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const value = btn.dataset.table || '';
+
+      // Clear previous "active" styles
+      tableButtons.forEach(b => b.classList.remove('active'));
+
+      if (tableInput.value === value) {
+        // Clicking the same button again unselects it
+        tableInput.value = '';
+      } else {
+        tableInput.value = value;
+        btn.classList.add('active');
+      }
+    });
+  });
+}
+
+function renderMenu() {
+  const catOrder = ["咖喱系列","茶記粉面","主食","飲品","小食","Others"];
+  const menuContent = document.getElementById('menu-content');
+
+  const itemsWithIndex = menu.map((item, index) => ({ ...item, index }));
+
+  const html = catOrder.map(cat => {
+    const items = itemsWithIndex.filter(i => i.cat === cat);
+    if (!items.length) return '';
+
+    let itemsHtml;
+
+    /*
+      We want ONLY these 6 curry rice dishes to always appear as:
+
+        Row 1: 咖喱雞扒飯  咖喱豬扒飯  咖喱牛腩飯
+        Row 2: 焗咖喱雞扒飯 焗咖喱豬扒飯 焗咖喱牛腩飯
+
+      So inside the 咖喱系列 category we:
+      - pick out just these 6 items into a separate array (curryItems)
+      - render them inside <div class="curry-group">, which has a 3-column grid in CSS
+      - render all the other items (otherItems) normally after that
+
+      This keeps the rest of the menu layout unchanged and applies the special
+      3-per-row layout only to the curry group.
+    */
+    if (cat === '咖喱系列') {
+      const curryNames = [
+        '咖喱雞扒飯', '咖喱豬扒飯', '咖喱牛腩飯',
+        '焗咖喱雞扒飯', '焗咖喱豬扒飯', '焗咖喱牛腩飯'
+      ];
+
+      const curryItems = items.filter(i => curryNames.includes(i.name));
+      const otherItems = items.filter(i => !curryNames.includes(i.name));
+
+      const curryHtml = curryItems.map(item => `
+        <button type="button" class="item" data-index="${item.index}">
+          <h3>${item.name}</h3>
+          <div class="price">£${item.price.toFixed(2)}</div>
+        </button>
+      `).join('');
+
+      const othersHtml = otherItems.map(item => `
+        <button type="button" class="item" data-index="${item.index}">
+          <h3>${item.name}</h3>
+          <div class="price">£${item.price.toFixed(2)}</div>
+        </button>
+      `).join('');
+
+      itemsHtml = `
+        <div class="curry-group">
+          ${curryHtml}
+        </div>
+        ${othersHtml}
+      `;
+    } else {
+      // All other categories render as before
+      itemsHtml = items.map(item => `
+        <button type="button" class="item" data-index="${item.index}">
+          <h3>${item.name}</h3>
+          <div class="price">£${item.price.toFixed(2)}</div>
+        </button>
+      `).join('');
+    }
+
+    return `
+      <div class="category">
+        <h2>${cat}</h2>
+        <div class="grid">
+          ${itemsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  menuContent.innerHTML = html;
+}
+
+function openModal(item, menuIndex) {
+  current = {
+    baseName: item.name,
+    price: item.price,
+    isHotCold: !!item.hotCold,
+    loMeinName: item.loMeinName || null,
+    loRamenName: item.loRamenName || null,
+    loDingName: item.loDingName || null,
+    SoupMeinName: item.SoupMeinName || null,
+    SoupRamenName: item.SoupRamenName || null,
+    SoupDingName: item.SoupDingName || null,
+    SoupVermicelliName: item.SoupVermicelliName || null,
+    SoupMacaroniName: item.SoupMacaroniName || null,
+    SoupSpaghettiName: item.SoupSpaghettiName || null,
+    DingName: item.DingName || null,
+    cat: item.cat,
+    menuIndex: (typeof menuIndex === 'number') ? menuIndex : null,
+    excludeFromComboB: !!item.excludeFromComboB
+  };
+
+  const head = document.querySelector('.modal-head');
+  if (head) head.textContent = `選擇選項：${item.name}`;
+
+  document.querySelectorAll('.opts').forEach(o => o.style.display = 'none');
+
+  // Always show the universal options for every item
+  const globalOpts = document.getElementById('global-opts');
+  if (globalOpts) globalOpts.style.display = 'grid';
+
+  if (Array.isArray(item.optionGroups)) {
+    item.optionGroups.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'grid';
+    });
+  }
+
+  document.querySelectorAll('.opt').forEach(o => o.classList.remove('sel'));
+  const noteEl = document.querySelector('#modal textarea');
+  if (noteEl) noteEl.value = '';
+
+  if (editingOrderItemIndex !== null && order[editingOrderItemIndex]) {
+    const existing = order[editingOrderItemIndex];
+    const existingMods = Array.isArray(existing.mods) ? existing.mods : [];
+
+    const visibleOpts = Array.from(document.querySelectorAll('.opts'))
+      .filter(group => group.style.display !== 'none')
+      .flatMap(group => Array.from(group.querySelectorAll('.opt')));
+
+    const usedMods = new Set();
+
+    visibleOpts.forEach(opt => {
+      const label = opt.textContent.trim();
+      if (existingMods.includes(label)) {
+        opt.classList.add('sel');
+        usedMods.add(label);
+      }
+    });
+
+    const leftover = existingMods.filter(m => !usedMods.has(m));
+    if (leftover.length && noteEl) {
+      noteEl.value = leftover.join(', ');
+    }
+  }
+
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function escapeHtml(str) {
+  str = String(str ?? '');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Turn table buttons on/off
+function setTableButtonsEnabled(enabled) {
+  const tableButtons = document.querySelectorAll('.table-btn');
+  const tableInput   = document.getElementById('order-number');
+
+  if (!tableButtons.length || !tableInput) return;
+
+  tableButtons.forEach(btn => {
+    btn.disabled = !enabled;
+    btn.classList.toggle('disabled', !enabled);
+  });
+
+  // If disabling, also clear the value
+  if (!enabled) {
+    tableInput.value = '';
+    tableButtons.forEach(b => b.classList.remove('active'));
+  }
+}
+
+// Clear current table selection (no highlight, no value)
+function resetTableSelection() {
+  const tableButtons = document.querySelectorAll('.table-btn');
+  const tableInput   = document.getElementById('order-number');
+
+  if (tableInput) tableInput.value = '';
+  tableButtons.forEach(b => b.classList.remove('active'));
+}
+
+function initTableButtons() {
+  const tableButtons = document.querySelectorAll('.table-btn');
+  const tableInput   = document.getElementById('order-number');
+
+  if (!tableButtons.length || !tableInput) return;
+
+  // click behaviour
+  tableButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return; // ignore clicks when disabled
+
+      const value = btn.dataset.table || '';
+
+      // Clear previous highlight
+      tableButtons.forEach(b => b.classList.remove('active'));
+
+      if (tableInput.value === value) {
+        // Clicking same button again → unselect
+        tableInput.value = '';
+      } else {
+        tableInput.value = value;
+        btn.classList.add('active');
+      }
+    });
+  });
+
+  // ⭐ tie enable/disable to service type (堂食 vs others)
+  if (typeof orderTypeSelect !== 'undefined' && orderTypeSelect) {
+    const applyMode = () => {
+      if (orderTypeSelect.value === 'dine-in') {
+        setTableButtonsEnabled(true);
+      } else {
+        setTableButtonsEnabled(false); // greys out + clears value
+      }
+    };
+
+    orderTypeSelect.addEventListener('change', applyMode);
+    applyMode(); // run once on load
+  }
+}
+
+function updateOrder() {
+  const list = document.getElementById('order-list');
+  const discountBox = document.getElementById('discount-summary');
+  let subtotal = 0;
+
+  let mainCount = 0;
+  let drinkCount = 0;
+  let snackCount = 0;
+
+  if (!order.length) {
+    list.innerHTML = '<p class="empty-order">No items yet</p>';
+    if (discountBox) discountBox.textContent = '';
+  } else {
+    let html = '';
+
+    order.forEach((o, i) => {
+      subtotal += o.final; 
+      let name = o.displayName;
+
+      if (o.cat === '咖喱系列' || o.cat === '茶記粉面' || o.cat === '主食') {
+        mainCount++;
+      } else if (o.cat === '飲品') {
+        drinkCount++;
+      } else if (o.cat === '小食') {
+        snackCount++;
+      }
+
+      if (o.isSpaghetti) name = name.replace(/意粉/g,'<span class="red">意粉</span>');
+      if (o.swapToChicken) name = name.replace('豬扒','<span class="red">雞扒</span>');
+      if (o.swapToPork) name = name.replace('雞扒','<span class="red">豬扒</span>');
+      if (o.isLoMein) name = name.replace('撈粗','<span class="red">撈粗</span>');
+      if (o.isLoRamen) name = name.replace('撈拉麵','<span class="red">撈拉麵</span>');
+      if (o.isLoDing) name = name.replace('撈丁','<span class="red">撈丁</span>');
+      if (o.isSoupMein) name = name.replace('湯粗','<span class="red">湯粗</span>');
+      if (o.isSoupRamen) name = name.replace('湯拉麵','<span class="red">湯拉麵</span>');
+      if (o.isSoupDing) name = name.replace('湯丁','<span class="red">湯丁</span>');
+      if (o.isSoupVermicelli) name = name.replace('湯米','<span class="red">湯米</span>');
+      if (o.isSoupMacaroni) name = name.replace('湯通','<span class="red">湯通</span>');
+      if (o.isSoupSpaghetti) name = name.replace('湯意','<span class="red">湯意</span>');
+      if (o.isDing) name = name.replace('丁','<span class="red">丁</span>');
+      if (o.isSetMeal) {name += ' <span class="blue">餐</span>';}
+
+      const modsHtml = o.mods.length
+        ? `<small style="color:#666;">${o.mods.map(escapeHtml).join(', ')}</small>`
+        : '';
+
+      html += `
+        <div class="order-item">
+          <div class="info">
+            <div class="price-line">£${o.final.toFixed(2)}</div>
+            <div>${name}</div>
+            ${modsHtml}
+          </div>
+          <div class="order-actions">
+            <button class="edit-btn" data-index="${i}" aria-label="Edit item">
+              <i class="fas fa-pen"></i>
+            </button>
+            <button class="delete-btn" data-index="${i}" aria-label="Remove item">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    list.innerHTML = html;
+  }
+
+  let comboBCount = Math.min(mainCount, drinkCount, snackCount);
+  mainCount -= comboBCount;
+  drinkCount -= comboBCount;
+  let comboACount = Math.min(mainCount, drinkCount);
+
+  const mealDealDiscount = comboBCount * 1.0 + comboACount * 0.5;
+  const baseTotal = subtotal - mealDealDiscount;
+
+  let cashDiscount = 0;
+  let finalTotal = baseTotal;
+
+  if (isCash && baseTotal > 0) {
+    cashDiscount = baseTotal * 0.05;
+    finalTotal = baseTotal - cashDiscount;
+    finalTotal = Math.floor(finalTotal * 10) / 10;
+  }
+
+  lastBaseTotal = baseTotal;
+  lastFinalTotal = (isCash && finalTotal > 0) ? finalTotal : baseTotal;
+  lastSubtotal = subtotal;
+  lastComboACount = comboACount;
+  lastComboBCount = comboBCount;
+  lastMealDealDiscount = mealDealDiscount;
+  lastCashDiscount = cashDiscount;
+
+  if (discountBox) {
+    if (!order.length || (mealDealDiscount <= 0 && (!isCash || cashDiscount <= 0))) {
+      discountBox.textContent = '';
+    } else {
+      let lines = [];
+      if (comboACount > 0) {
+        lines.push(`Combo A x${comboACount}: -£${(comboACount * 0.5).toFixed(2)}`);
+      }
+      if (comboBCount > 0) {
+        lines.push(`Combo B x${comboBCount}: -£${(comboBCount * 1.0).toFixed(2)}`);
+      }
+      if (isCash && cashDiscount > 0) {
+        lines.push(`Cash 5%: -£${cashDiscount.toFixed(2)}`);
+      }
+      discountBox.innerHTML = lines.join('<br>');
+    }
+  }
+
+  const totalEl = document.getElementById('total');
+  if (isCash && finalTotal > 0) {
+    totalEl.textContent = '£' + finalTotal.toFixed(1);
+  } else {
+    totalEl.textContent = '£' + baseTotal.toFixed(2);
+  }
+
+  // ✅ keep Customer screen in sync
+  renderCustomerView();
+}
+
+document.getElementById('add').addEventListener('click', () => {
+  if (!current) {
+    alert('No item is selected – please close this window and click a menu item again.');
+    return;
+  }
+
+    const sel = Array.from(
+    document.querySelectorAll('#modal .opts')
+  )
+    .filter(group => group.style.display !== 'none')
+    .flatMap(group => Array.from(group.querySelectorAll('.opt.sel')));
+
+  const mods = sel.map(o => o.textContent.trim());
+  const noteEl = document.querySelector('#modal textarea');
+  const note = noteEl ? noteEl.value.trim() : '';
+  if (note) mods.push(note);
+
+  let name = current.baseName;
+  let price = current.price;
+  let isSpaghetti = false;
+  let isLoMein = false;
+  let isLoRamen = false;
+  let isLoDing = false;
+  let isSoupMein = false;
+  let isSoupRamen = false;
+  let isSoupDing = false;
+  let isSoupVermicelli = false;
+  let isSoupMacaroni = false;
+  let isSoupSpaghetti = false;
+  let isDing = false;
+  let swapToChicken = false;
+  let swapToPork = false;
+  let isSetMeal = false;
+  let addedSpringOnionLoCharge = false;
+
+  sel.forEach(opt => {
+    const v = opt.textContent.trim();
+    if (v === '意粉') {
+      name = name.replace('飯','意粉');
+      isSpaghetti = true;
+    }
+    if (v === '轉雞扒') {
+      name = name.replace('豬扒','雞扒');
+      swapToChicken = true;
+    }
+    if (v === '轉豬扒') {
+      name = name.replace('雞扒','豬扒');
+      swapToPork = true;
+    }
+    if (v === '撈粗' && current.loMeinName) {
+      name = current.loMeinName;
+      isLoMein = true;
+    }
+    if (v === '撈拉麵' && current.loRamenName) {
+      name = current.loRamenName;
+      isLoRamen = true;
+    }
+    if (v === '撈丁' && current.loDingName) {
+      name = current.loDingName;
+      isLoDing = true;
+    }
+    if (
+      !addedSpringOnionLoCharge &&
+      (v === '撈粗' || v === '撈丁') &&
+      (current.baseName === '蔥油雞扒煎蛋飯' ||
+       current.baseName === '蔥油豬扒煎蛋飯')
+    ) {
+      price += 1;
+      addedSpringOnionLoCharge = true;
+    }
+    if (v === '湯粗' && current.SoupMeinName) {
+      name = current.SoupMeinName;
+      isSoupMein = true;
+    }
+    if (v === '湯拉麵' && current.SoupRamenName) {
+      name = current.SoupRamenName;
+      isSoupRamen = true;
+    }
+    if (v === '湯丁' && current.SoupDingName) {
+      name = current.SoupDingName;
+      isSoupDing = true;
+    }
+    if (v === '湯米' && current.SoupVermicelliName) {
+      name = current.SoupVermicelliName;
+      isSoupVermicelli = true;
+    }
+    if (v === '湯通' && current.SoupMacaroniName) {
+      name = current.SoupMacaroniName;
+      isSoupMacaroni = true;
+    }
+    if (v === '湯意' && current.SoupSpaghettiName) {
+      name = current.SoupSpaghettiName;
+      isSoupSpaghetti = true;
+    }
+    if (v === '丁' && current.DingName) {
+      name = current.DingName;
+      isDing = true;
+    }
+    if ((v === '熱' || v === '凍') && current.isHotCold) {
+      name = v + name;
+    }
+    if (v === '餐') {
+      price += 2;
+      isSetMeal = true;
+    }
+  });
+
+  const newItem = {
+    displayName: name,
+    final: price,
+    mods,
+    isSpaghetti,
+    isLoMein,
+    isLoRamen,
+    isLoDing,
+    isSoupMein,
+    isSoupRamen,
+    isSoupDing,
+    isSoupVermicelli,
+    isSoupMacaroni,
+    isSoupSpaghetti,
+    isDing,
+    isSetMeal,
+    swapToChicken,
+    swapToPork,
+    cat: current.cat,
+    menuIndex: (typeof current.menuIndex === 'number') ? current.menuIndex : null,
+    excludeFromComboB: !!current.excludeFromComboB
+  };
+
+  // ✅ If editing an All Orders ticket item, save back into that ticket instead of POS order[]
+  if (editingTicketItem) {
+    const ticket = findTicketById(editingTicketItem.ticketId);
+    if (ticket) {
+      const arr = (editingTicketItem.lane === 'food') ? ticket.foodItems : ticket.drinkItems;
+      const old = arr && arr[editingTicketItem.index];
+
+      if (arr && old) {
+        // preserve status (complete/in-progress) and anything else not in newItem
+        arr[editingTicketItem.index] = {
+          ...old,
+          ...newItem,
+          status: old.status || 'in-progress'
+        };
+      }
+
+      // ✅ also update completedOrders record (for CSV/admin) if it exists
+      const summary = completedOrders.find(o => o.id === ticket.id);
+      if (summary) {
+        summary.items = [
+          ...(ticket.foodItems || []),
+          ...(ticket.drinkItems || [])
+        ].map(it => ({
+          name: it.displayName || it.name || '',
+          category: it.cat || '',
+          amount: Number(it.final ?? it.price ?? 0) || 0
+        }));
+      }
+
+      // ⭐ NEW: push updated items (including mods) to Supabase
+      // saveTicketItemsToSupabase already:
+      //   - rebuilds items with { name, category, amount, status, mods }
+      //   - checks ticket.supabaseId
+      //   - updates the `items` (and completed_at if present) in the orders row
+      saveTicketItemsToSupabase(ticket);
+    }
+
+    // cleanup + refresh views
+    editingTicketItem = null;
+    editingOrderItemIndex = null;
+
+    document.getElementById('modal').style.display = 'none';
+    current = null;
+
+    renderKitchenView();
+    renderBarView();
+    renderAllOrdersView();
+    if (adminUnlocked) renderAdminView();
+
+    return;
+  }
+
+  if (editingOrderItemIndex !== null && typeof editingOrderItemIndex === 'number') {
+    order[editingOrderItemIndex] = newItem;
+  } else {
+    order.push(newItem);
+  }
+
+  editingOrderItemIndex = null;
+  updateOrder();
+  document.getElementById('modal').style.display = 'none';
+  current = null;
+});
+
+document.getElementById('cancel').addEventListener('click', () => {
+  document.getElementById('modal').style.display = 'none';
+  current = null;
+  editingOrderItemIndex = null;
+  editingTicketItem = null;
+});
+
+// Menu click delegation with direct-add logic
+document.getElementById('menu-content').addEventListener('click', e => {
+  const card = e.target.closest('.item');
+  if (!card) return;
+
+  const index = parseInt(card.dataset.index, 10);
+  if (Number.isNaN(index)) return;
+
+  const item = menu[index];
+
+  const isDirectCategory = DIRECT_ADD_CATEGORIES.includes(item.cat);
+  const isDirectDrink = DIRECT_ADD_DRINKS.includes(item.name);
+
+  if (isDirectCategory || isDirectDrink) {
+    order.push({
+      displayName: item.name,
+      final: item.price,
+      mods: [],
+      cat: item.cat,
+      menuIndex: index,
+    });
+    updateOrder();
+  } else {
+    editingOrderItemIndex = null;
+    openModal(item, index);
+  }
+});
+
+// Order delete delegation
+document.getElementById('order-list').addEventListener('click', e => {
+  const btn = e.target.closest('.delete-btn');
+  if (!btn) return;
+
+  const idx = parseInt(btn.dataset.index, 10);
+  if (Number.isNaN(idx)) return;
+
+  order.splice(idx, 1);
+  updateOrder();
+});
+
+// Order edit delegation
+document.getElementById('order-list').addEventListener('click', e => {
+  const btn = e.target.closest('.edit-btn');
+  if (!btn) return;
+
+  const idx = parseInt(btn.dataset.index, 10);
+  if (Number.isNaN(idx)) return;
+
+  const item = order[idx];
+  if (!item) return;
+
+  editingOrderItemIndex = idx;
+
+  let menuIndex = (typeof item.menuIndex === 'number') ? item.menuIndex : -1;
+
+  if (menuIndex < 0) {
+    const baseName = item.displayName.replace(/^(熱|凍)/, '');
+    menuIndex = menu.findIndex(m => m.name === baseName);
+  }
+
+  if (menuIndex < 0) {
+    alert('Cannot edit this item (no matching menu entry found).');
+    editingOrderItemIndex = null;
+    return;
+  }
+
+  const menuItem = menu[menuIndex];
+  openModal(menuItem, menuIndex);
+});
+
+// Options click behaviour
+document.querySelectorAll('.opt').forEach(o => {
+  o.addEventListener('click', () => {
+    const parent = o.parentElement;
+    if (parent && parent.id === 'hot-cold-opts') {
+      parent.querySelectorAll('.opt').forEach(sib => sib.classList.remove('sel'));
+      o.classList.add('sel');
+    } else {
+      o.classList.toggle('sel');
+    }
+  });
+});
+
+const payBtn = document.getElementById('pay-btn');
+const payModal = document.getElementById('pay-modal');
+const amountDueEl = document.getElementById('amount-due');
+const amountInput = document.getElementById('amount-received');
+const changeEl = document.getElementById('change-amount');
+const payCancel = document.getElementById('pay-cancel');
+const payConfirm = document.getElementById('pay-confirm');
+const cardBtn = document.getElementById('card-btn');
+
+const platformBtn = document.getElementById('platform-btn');
+const orderTypeSelect = document.getElementById('order-type');
+
+/*
+  DEV FEATURE: Payment Order View popup
+  This click handler is attached to the "Payment" button in the footer.
+  It opens the large payment modal with the order summary and card/cash
+  controls. The order is NOT finalised here – that only happens when the
+  Confirm button inside the popup is clicked.
+*/
+const paymentViewBtn = document.getElementById('payment-view-btn');
+
+if (paymentViewBtn) {
+  paymentViewBtn.addEventListener('click', () => {
+    // No order = nothing to pay → show a clear message instead of doing nothing
+    if (!order || !order.length) {
+      alert('No items in the order.');
+      return;
+    }
+
+    // Reset selected method state
+    paymentMethod = null;
+
+    // Disable Confirm until a method is chosen
+    const confirmBtn = document.getElementById('payment-confirm-btn');
+    if (confirmBtn) confirmBtn.disabled = true;
+
+    // Render the order summary into the left side of the popup
+    renderPaymentOrderSummary();
+
+    // Reset cash calculator fields
+    const cashGivenInput = document.getElementById('cash-given');
+    const cashChangeEl = document.getElementById('cash-change');
+    if (cashGivenInput) cashGivenInput.value = '';
+    if (cashChangeEl) cashChangeEl.textContent = '0.00';
+
+    // Open the Payment modal by removing the .hidden class
+    const paymentModalEl = document.getElementById('payment-modal');
+    if (paymentModalEl) {
+      paymentModalEl.classList.remove('hidden');
+    }
+  });
+}
+
+function isPlatformOrder() {
+  const v = orderTypeSelect ? orderTypeSelect.value : '';
+  return v === 'dine-in' || v === 'takeaway' || v === 'phone';
+}
+
+// ========= PAYMENT VIEW BUTTON (DEV) =========
+// This button opens the big Payment Order popup.
+// NOTE: It does NOT finalise payment. That only happens
+// when Confirm is clicked inside the popup.
+const paymentViewBtn = document.getElementById('payment-view-btn');
+
+if (paymentViewBtn) {
+  paymentViewBtn.addEventListener('click', () => {
+
+    // No order = nothing to pay
+    if (!order || !order.length) {
+      alert('No items in the order.');
+      return;
+    }
+
+    // Reset method state
+    paymentMethod = null;
+
+    // Disable Confirm until a method is chosen
+    const confirmBtn = document.getElementById('payment-confirm-btn');
+    if (confirmBtn) confirmBtn.disabled = true;
+
+    // Render the order summary on the left side
+    renderPaymentOrderSummary();
+
+    // Reset cash calculator
+    const cashGivenInput = document.getElementById('cash-given');
+    const cashChangeEl = document.getElementById('cash-change');
+    if (cashGivenInput) cashGivenInput.value = '';
+    if (cashChangeEl) cashChangeEl.textContent = '0.00';
+
+    // ⭐ OPEN the payment popup by removing .hidden
+    const paymentModalEl = document.getElementById('payment-modal');
+    if (paymentModalEl) {
+      paymentModalEl.classList.remove('hidden');
+    }
+  });
+}
+
+function isPlatformOrder() {
+  const v = orderTypeSelect ? orderTypeSelect.value : '';
+  return v === 'deliveroo' || v === 'justeat';
+}
+
+function syncPayButtonsByType() {
+  const cardBtn = document.getElementById('card-btn');
+  const cashBtn = document.getElementById('pay-btn'); // your cash button id
+  if (!cardBtn || !cashBtn) return;
+
+  const platform = isPlatformOrder(); // deliveroo / justeat
+
+  cardBtn.disabled = platform;
+  cashBtn.disabled = platform;
+
+  cardBtn.style.opacity = platform ? '0.5' : '1';
+  cashBtn.style.opacity = platform ? '0.5' : '1';
+}
+
+function syncPlatformBtnState() {
+  if (!platformBtn) return;
+  const on = isPlatformOrder();
+  platformBtn.disabled = !on;
+  platformBtn.style.opacity = on ? '1' : '0.5';
+}
+
+const unpaidBtn = document.getElementById('unpaid-btn');
+
+function canUnpaidOrder() {
+  const v = orderTypeSelect ? orderTypeSelect.value : '';
+  return v === 'dine-in' || v === 'takeaway' || v === 'phone';
+}
+
+function syncUnpaidBtnState() {
+  if (!unpaidBtn) return;
+  const on = canUnpaidOrder();
+  unpaidBtn.disabled = !on;
+  unpaidBtn.style.opacity = on ? '1' : '0.5';
+}
+
+// ✅ Initial state (run AFTER unpaidBtn exists)
+syncUnpaidBtnState();
+syncPayButtonsByType();
+syncPlatformBtnState();
+
+// make sure both Add + Unpaid update when type changes
+if (orderTypeSelect) {
+  orderTypeSelect.addEventListener('change', () => {
+    syncPlatformBtnState();
+    syncUnpaidBtnState();
+    syncPayButtonsByType();   // ✅ add this
+  });
+}
+syncUnpaidBtnState();
+
+// ----------------------
+// Cash pay button (opens popup)
+// ----------------------
+payBtn.addEventListener('click', () => {
+  if (!order.length) {
+    alert('No items in the order.');
+    return;
+  }
+
+  // ⭐ NEW: enforce table number for dine-in BEFORE opening cash popup
+  const tableInput  = document.getElementById('order-number');
+  const rawTable    = tableInput ? tableInput.value.trim() : '';
+  const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
+
+  if (serviceType === 'dine-in' && !rawTable) {
+    alert('請選擇枱號.');
+    return; // ⛔ stop here, don't open popup
+  }
+
+  // ✅ Auto apply cash discount + show “Cash 5%” line in summary
+  isCash = true;
+
+  // keep the header toggle button visually in sync (optional)
+  const cashBtnEl = document.getElementById('cash-btn');
+  if (cashBtnEl) cashBtnEl.classList.add('active');
+
+  updateOrder(); // so “Cash 5%: -£x.xx” shows before popup
+  renderCustomerView();
+
+  // cash total shown with 1 decimal
+  amountDueEl.textContent = '£' + lastFinalTotal.toFixed(1);
+
+  amountInput.value = '';
+  changeEl.textContent = '£0.00';
+  changeEl.parentElement.classList.remove('negative');
+
+  payModal.style.display = 'flex';
+  amountInput.focus();
+});
+
+// live change calculation for cash popup
+amountInput.addEventListener('input', () => {
+  const val = parseFloat(amountInput.value);
+
+  if (isNaN(val)) {
+    changeEl.textContent = '£0.00';
+    changeEl.parentElement.classList.remove('negative');
+    return;
+  }
+
+  const change = val - lastFinalTotal;
+  changeEl.textContent = '£' + change.toFixed(2);
+
+  if (change < 0) {
+    changeEl.parentElement.classList.add('negative');
+  } else {
+    changeEl.parentElement.classList.remove('negative');
+  }
+});
+
+// ✅ Quick cash preset buttons (MOVED OUTSIDE so it works immediately)
+document.querySelectorAll('#pay-modal .preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+
+const mode = getMode();
+if (mode === 'customer') {
+  const allowed = new Set(['customer', 'waitlist']);
+  const key = btn.dataset.tab;
+  if (!allowed.has(key)) return;
+}    
+
+const v = btn.dataset.val;
+
+    if (v === 'exact') {
+      amountInput.value = String(lastFinalTotal.toFixed(2));
+    } else {
+      amountInput.value = v;
+    }
+
+    // Trigger existing change calculation
+    amountInput.dispatchEvent(new Event('input'));
+    amountInput.focus();
+  });
+});
+
+payCancel.addEventListener('click', () => {
+  payModal.style.display = 'none';
+
+  // revert cash mode if payment cancelled
+  isCash = false;
+  const cashBtnEl = document.getElementById('cash-btn');
+  if (cashBtnEl) cashBtnEl.classList.remove('active');
+  updateOrder();
+  renderCustomerView();
+});
+
+// confirm cash payment → uses finalizeOrder('cash')
+payConfirm.addEventListener('click', () => {
+  const val = parseFloat(amountInput.value);
+  if (isNaN(val)) {
+    alert('Please enter the cash received.');
+    return;
+  }
+
+  const change = val - lastFinalTotal;
+  if (change < 0) {
+    alert('Cash received is not enough.');
+    return;
+  }
+
+  finalizeOrder('cash');
+});
+
+// ⬇️ NOW paste Snippet D here ⬇️
+
+// ========= PAYMENT MODAL WIRING (DEV) =========
+const payMethodCardBtn = document.getElementById('pay-method-card');
+const payMethodCashBtn = document.getElementById('pay-method-cash');
+const paymentConfirmBtn = document.getElementById('payment-confirm-btn');
+
+const paymentCardPanel = document.getElementById('payment-card-panel');
+const paymentCashPanel = document.getElementById('payment-cash-panel');
+
+const cashTotalDueEl = document.getElementById('cash-total-due');
+const cashGivenInput = document.getElementById('cash-given');
+const cashChangeEl = document.getElementById('cash-change');
+
+/*
+  Set UI based on selected method:
+  - highlight the chosen tab
+  - show/hide card vs cash panel
+  - allow Confirm only when a method is chosen
+  - when cash is chosen, fill the "total due" from lastFinalTotal
+*/
+function setPaymentMethodUI(method) {
+  paymentMethod = method;
+
+  if (payMethodCardBtn && payMethodCashBtn) {
+    payMethodCardBtn.classList.toggle('active', method === 'card');
+    payMethodCashBtn.classList.toggle('active', method === 'cash');
+  }
+
+  if (paymentCardPanel && paymentCashPanel) {
+    paymentCardPanel.classList.toggle('hidden', method !== 'card');
+    paymentCashPanel.classList.toggle('hidden', method !== 'cash');
+  }
+
+  // Enable / disable Confirm
+  if (paymentConfirmBtn) {
+    paymentConfirmBtn.disabled = !method;
+  }
+
+  // When switching to cash, update the total due shown in the calculator
+  if (method === 'cash' && cashTotalDueEl) {
+    const total =
+      typeof lastFinalTotal === 'number' ? lastFinalTotal : 0;
+    cashTotalDueEl.textContent = total.toFixed(2);
+
+    if (cashGivenInput) cashGivenInput.value = '';
+    if (cashChangeEl) cashChangeEl.textContent = '0.00';
+  }
+}
+
+// Click handlers for Card / Cash tabs inside the popup
+if (payMethodCardBtn) {
+  payMethodCardBtn.addEventListener('click', () => setPaymentMethodUI('card'));
+}
+if (payMethodCashBtn) {
+  payMethodCashBtn.addEventListener('click', () => setPaymentMethodUI('cash'));
+}
+
+/*
+  Cash calculator:
+  - total due uses lastFinalTotal (same as your current cash total)
+  - user types amount given
+  - we show the change (if negative, show 0.00 to avoid confusion)
+*/
+function updateCashCalculator() {
+  if (!cashTotalDueEl || !cashChangeEl) return;
+
+  const total =
+    typeof lastFinalTotal === 'number' ? lastFinalTotal : 0;
+  const given = parseFloat(cashGivenInput?.value || '0');
+  const change = given - total;
+
+  cashTotalDueEl.textContent = total.toFixed(2);
+  cashChangeEl.textContent = change > 0 ? change.toFixed(2) : '0.00';
+}
+
+if (cashGivenInput) {
+  cashGivenInput.addEventListener('input', updateCashCalculator);
+}
+
+/*
+  Confirm button:
+  - Only finalises the order once a method has been chosen
+  - Reuses your existing finalizeOrder(paymentMethod)
+  - Then closes the payment popup
+*/
+if (paymentConfirmBtn) {
+  paymentConfirmBtn.addEventListener('click', () => {
+    if (!paymentMethod) return;
+
+    // Reuse existing logic (card or cash)
+    finalizeOrder(paymentMethod);
+
+    // Close the payment modal (hide our custom popup)
+    const paymentModalEl = document.getElementById('payment-modal');
+    if (paymentModalEl) {
+      paymentModalEl.classList.add('hidden');   // <- hide overlay
+    }
+  });
+};
+
+// ----------------------
+// STEP 5: Supabase – save paid orders to `orders` table
+// ----------------------
+// This helper takes the `ticket` object we already build in finalizeOrder()
+// and sends a *copy* of it to the Supabase `orders` table.
+// It uses the global `supabaseClient` that you created in <head>.
+async function saveOrderToSupabase(ticket) {
+  // If Supabase isn't loaded for some reason, fail safely and keep POS working.
+  if (typeof supabaseClient === 'undefined') {
+    console.warn('Supabase client not found – skipping remote save.');
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from('orders')
+      .insert({
+        // We let Supabase generate its own `id` (uuid PK), so we do NOT send ticket.id here.
+
+        // These column names must match the columns you created in Supabase:
+        // order_number (text), service_type (text), channel (text),
+        // created_at (timestamptz), payment_status (text),
+        // payment_method (text), paid_at (timestamptz),
+        // amount (numeric), items (jsonb).
+        // ✅ do NOT send order_number; leave it out so the trigger can fill it
+        service_type: ticket.serviceType,
+        channel: ticket.channel,
+        created_at: ticket.createdAt,
+        payment_status: ticket.paymentStatus, // e.g. 'paid'
+        payment_method: ticket.paymentMethod, // 'cash' | 'card' | 'deliveroo' | 'justeat'
+        paid_at: ticket.paidAt,
+        amount: ticket.amount,
+
+        // ⭐ store table number in Supabase
+        table_number:  ticket.tableNumber || null,
+
+        combo_discount: ticket.comboDiscount || 0,
+
+        // Combine food + drink items into one JSON array for the `items` jsonb column.
+        items: [
+          ...(ticket.foodItems || []),
+          ...(ticket.drinkItems || [])
+        ].map(it => ({
+          // Keep only the bits we care about later (for reports).
+          name: it.displayName || it.name || '',
+          category: it.cat || '',
+          amount: Number(it.final ?? it.price ?? 0) || 0,
+          status: it.status || 'in-progress',
+          mods: Array.isArray(it.mods) ? it.mods : [],
+          menuIndex: (typeof it.menuIndex === 'number') ? it.menuIndex : null,
+          isSetMeal: !!it.isSetMeal
+        }))
+      });
+
+    if (error) {
+      // Log the error, but do NOT block the POS – order still exists locally.
+      console.error('Supabase insert error:', error.message);
+    }
+  } catch (err) {
+    // Catch any network / unexpected error so the app never crashes.
+    console.error('Unexpected Supabase error:', err);
+  }
+}
+
+// 🔄 Save updated item statuses back into Supabase
+async function saveTicketItemsToSupabase(orderObj) {
+  try {
+    if (!orderObj || !orderObj.supabaseId) return; // no DB row? stop
+
+    // Build a flat array for Supabase (food + drink together)
+    const allItems = [
+      ...(orderObj.foodItems || []),
+      ...(orderObj.drinkItems || [])
+    ].map(it => ({
+      name: it.displayName || it.name || '',
+      category: it.cat || '',
+      amount: Number(it.final ?? it.price ?? 0) || 0,
+      status: it.status || 'in-progress',
+      mods: Array.isArray(it.mods) ? it.mods : [],
+      menuIndex: (typeof it.menuIndex === 'number') ? it.menuIndex : null,
+      isSetMeal: !!it.isSetMeal
+    }));
+
+    // ⭐ Build update payload
+    const updatePayload = { items: allItems };
+
+    // If order has a completion time, also update completed_at column
+    if (orderObj.completedAt) {
+      updatePayload.completed_at = orderObj.completedAt;
+    }
+
+    const { error } = await supabaseClient
+      .from('orders')
+      .update(updatePayload)
+      .eq('id', orderObj.supabaseId);
+
+    if (error) {
+      console.error('❌ Failed to sync item statuses to Supabase:', error.message);
+    }
+  } catch (err) {
+    console.error('❌ Unexpected Supabase error:', err);
+  }
+}
+
+// ----------------------
+// Shared finalise logic (cash + card)
+// ----------------------
+function finalizeOrder(paymentMethod, overrideTotal = null) {
+  // If we are paying an existing Unpaid ticket, do NOT create a new kitchen ticket
+  if (payingOrderId) {
+    payExistingTicket(paymentMethod, overrideTotal);
+    return;
+  }
+
+  if (!order.length) {
+    alert('No items in the order.');
+    return;
+  }
+
+  // Card/platform should not apply cash discount
+  if (
+    paymentMethod === 'card' ||
+    paymentMethod === 'deliveroo' ||
+    paymentMethod === 'justeat'
+  ) {
+    isCash = false;
+    updateOrder();
+  }
+
+  const orderNumberInput = document.getElementById('order-number');
+  const pickupInput      = document.getElementById('pickup-time');
+
+  // TABLE number 1-8 from POS
+  const rawTable = orderNumberInput ? orderNumberInput.value.trim() : '';
+
+  // Order type(堂食 / 現場外賣 / 電話外賣 / Deliveroo / JustEat...)
+  const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
+
+  // 🔎 read pickup time (could be empty string)
+  const pickupTime = pickupInput ? pickupInput.value.trim() : '';
+
+  // ⛔ Require table for dine-in orders
+  if (serviceType === 'dine-in' && !rawTable) {
+    alert('請選擇枱號.');
+    return;
+  }
+
+  // ⛔ NEW RULE: Deliveroo / JustEat / Phone must have pickup time
+  if (
+    (serviceType === 'deliveroo' ||
+    serviceType === 'justeat'   ||
+    serviceType === 'phone') &&
+    !pickupTime
+  ) {
+    alert('請輸入取餐時間.');
+    return;  // ❗ stop here – do NOT send order to kitchen/bar/all-orders
+  }
+
+  // 🟢 TABLE number = what staff chose (may be empty for takeaway/delivery)
+  const tableNumber = rawTable || '';
+
+  // 🟡 Local running label for this ticket (small, internal)
+  //     Supabase will later give you the real YYYYMMDD-SEQ in row.order_number
+  const orderNumber = '';   // Supabase will fill this later
+
+  // Channel (for pickup time / short code)
+  let channel = pickupInput ? pickupInput.value.trim() : '';
+  if (channel.length >= 5) channel = channel.slice(0, 5);
+
+  const now       = new Date();
+  const createdAt = now.toISOString();
+  const timeStr   = now.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const orderId   = now.getTime();
+
+  const foodCats = ['咖喱系列', '茶記粉面', '主食', '小食'];
+
+  const foodItems = order
+    .filter(item => foodCats.includes(item.cat))
+    .map(item => ({ ...item, status: 'in-progress' }));
+
+  const drinkItems = order
+    .filter(item => item.cat === '飲品')
+    .map(item => ({ ...item, status: 'in-progress' }));
+
+  const paidTotal =
+    typeof overrideTotal === 'number' ? overrideTotal : lastFinalTotal;
+
+  const ticket = {
+    id: orderId,
+
+    // 🔹 Small label (local) – will be overwritten by Supabase order_number later if you want
+    orderNumber,
+
+    // 🔹 Big table label used in Kitchen/Bar
+    tableNumber,
+
+    serviceType,
+    channel,
+    time: timeStr,
+    createdAt,
+
+    paymentStatus: 'paid',
+    paymentMethod,
+    paidAt: createdAt,
+
+    amount: paidTotal,
+    foodItems,
+    drinkItems,
+
+    comboDiscount: lastMealDealDiscount || 0
+  };
+
+  // Add to in-memory boards
+  kitchenOrders.push(ticket);
+
+  // STEP 5: also save this paid order to Supabase in the background.
+  // We don't `await` here so the POS stays responsive even if the network is slow.
+  saveOrderToSupabase(ticket);
+
+  // Record to CSV source (paid orders only) — now includes item lines
+  completedOrders.push({
+    id: orderId,
+    orderNumber,
+    serviceType,
+    channel,
+    createdAt,
+    completedAt: null,
+    paidAt: createdAt,
+    paymentMethod,
+    total: paidTotal,
+    items: [
+      ...(foodItems || []),
+      ...(drinkItems || [])
+    ].map(it => ({
+      name: it.displayName || it.name || '',
+      category: it.cat || '',
+      amount: Number(it.final ?? it.price ?? 0) || 0
+    }))
+  });
+
+  // clear POS
+  order = [];
+  isCash = false;
+  payingOrderId = null;
+  updateOrder();
+
+  if (orderNumberInput) orderNumberInput.value = '';
+  if (pickupInput)      pickupInput.value = '';
+
+  // ⭐ Reset service type + table selection back to default (堂食)
+  resetServiceTypeAndTable();
+
+  payModal.style.display = 'none';
+
+  renderKitchenView();
+  renderBarView();
+  renderAllOrdersView();
+  if (adminUnlocked) renderAdminView();
+}
+
+// ----------------------
+// Card button (NO popup) – just finalise immediately
+// ----------------------
+if (cardBtn) {
+  cardBtn.addEventListener('click', () => {
+    // allow paying an existing unpaid ticket even if POS draft is empty
+    if (!order.length && !payingOrderId) {
+      alert('No items in the order.');
+      return;
+    }
+
+    isCash = false;
+    updateOrder();
+    finalizeOrder('card');
+  });
+}
+
+if (unpaidBtn) {
+  unpaidBtn.addEventListener('click', createUnpaidTicketFromCurrentOrder);
+}
+
+if (platformBtn) {
+  platformBtn.addEventListener('click', () => {
+    if (!order.length) {
+      alert('No items in the order.');
+      return;
+    }
+
+    if (!isPlatformOrder()) {
+      alert('This button is only for Deliveroo / Just Eat orders.');
+      return;
+    }
+
+    // ✅ No popup – use POS-calculated total
+    isCash = false;
+    const cashBtnEl = document.getElementById('cash-btn');
+    if (cashBtnEl) cashBtnEl.classList.remove('active');
+    updateOrder();
+    finalizeOrder(orderTypeSelect.value, lastFinalTotal);
+  });
+}
+
+// ----------------------
+// Tab switching (uses data-tab, not data-view)
+// ----------------------
+function switchToView(viewId) {
+  // Admin lock (only if switching to admin)
+  if (viewId === 'admin-view') {
+    if (!adminUnlocked) {
+      const pw = prompt('Enter Admin password:');
+      if (pw !== ADMIN_PASSWORD) return; // stop switch
+      adminUnlocked = true;
+    }
+  } else {
+    // auto-lock admin when leaving Admin
+    adminUnlocked = false;
+
+    // 💾 Remember this view as the active tab on THIS device
+  localStorage.setItem('lionrock_pos_active_tab', viewId);
+
+  // ... your existing code that:
+  // - hides all views
+  // - shows the target view
+  // - updates active tab button styles, etc.
+  }
+
+  // Tab active state
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.querySelector(`.tab[data-tab="${viewId}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // Show/hide views
+  const views = ['pos-view', 'kitchen-view', 'bar-view', 'all-orders-view', 'customer-view', 'admin-view', 'waitlist-view'];
+  views.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = (id === viewId) ? (id === 'pos-view' ? 'flex' : 'block') : 'none';
+  });
+
+  // Render the view if needed
+  if (viewId === 'customer-view') renderCustomerView();
+  if (viewId === 'waitlist-view') renderWaitlist();
+  if (viewId === 'admin-view') renderAdminView();
+  if (viewId === 'kitchen-view') renderKitchenView();
+  if (viewId === 'bar-view') renderBarView();
+  if (viewId === 'all-orders-view') renderAllOrdersView();
+}
+
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const viewId = btn.dataset.tab; // ✅ correct attribute
+    if (!viewId) return;
+    switchToView(viewId);
+  });
+});
+
+// ----------------------
+// Kitchen/bar ticket line renderer (with Complete button)
+// ----------------------
+function renderTicketItemLine(item, orderId, index, kind) {
+  const modsArray = Array.isArray(item.mods) ? item.mods : [];
+  const modsHtml = modsArray.length
+    ? `<div class="ticket-mods">${modsArray.join(', ')}</div>`
+    : '';
+
+  const isDone = item.status === 'complete';
+
+  let name = item.displayName || '';
+  if (item.isSetMeal) {
+    name += ' <span class="blue">餐</span>';
+  }
+
+  return `
+    <div class="ticket-item ${isDone ? 'done' : ''}">
+      <div class="ticket-item-main">
+        <div class="ticket-item-name">${name}</div>
+        ${modsHtml}
+      </div>
+      <button
+        type="button"
+        class="ticket-status-btn ${isDone ? 'done' : ''}"
+        data-order-id="${orderId}"
+        data-index="${index}"
+        data-kind="${kind}"
+      >
+        ${isDone ? 'Done' : 'Complete'}
+      </button>
+    </div>
+  `;
+}
+
+// 🧠 Helper: decide what to show in the BIG header label
+// - Dine-in   → "TABLE 3"
+// - 現場外賣   → "現場外賣" (no table number)
+// - 電話外賣   → "電話外賣"
+// - Deliveroo → "Deliveroo"
+// - JustEat   → "JustEat"
+// - No table + unknown type → empty
+function getTicketTableLabel(orderObj) {
+  const st = orderObj.serviceType || '';
+  const tableNo = orderObj.tableNumber;
+
+  // ✅ Dine-in still shows table number
+  if (st === 'dine-in') {
+    // If for some reason no table number, keep old "TABLE -" behaviour
+    return tableNo ? `TABLE ${tableNo}` : 'TABLE -';
+  }
+
+  // ✅ Takeaway / phone orders: show service type (no "TABLE -")
+  if (st === 'takeaway') return '現場外賣';
+  if (st === 'phone')    return '電話外賣';
+
+  // ✅ Delivery platforms: show platform name (no "TABLE -")
+  if (st === 'deliveroo') return 'Deliveroo';
+  if (st === 'justeat')   return 'JustEat'; // change to 'Just Eat' if you prefer the space
+
+  // 🔙 Fallback: if we *do* have a table number, show it, otherwise show nothing
+  return tableNo ? `TABLE ${tableNo}` : '';
+}
+
+// ----------------------
+// Kitchen view (food only)
+// ----------------------
+function renderKitchenView() {
+  const wrap = document.getElementById('kitchen-orders');
+  if (!wrap) return;
+
+  let html = '';
+
+  kitchenOrders.forEach(orderObj => {
+    if (!orderObj.foodItems || !orderObj.foodItems.length) return;
+
+const ticketClass =
+  orderObj.serviceType === 'deliveroo' ? 'ticket ticket-deliveroo' :
+  orderObj.serviceType === 'justeat'   ? 'ticket ticket-justeat'   :
+  orderObj.serviceType === 'takeaway'    ? 'ticket ticket-takeaway'    :
+  orderObj.serviceType === 'phone'       ? 'ticket ticket-phone'       :
+  'ticket';
+
+    html += `
+      <div class="${ticketClass}">
+        <div class="ticket-header">
+
+        <!-- ⭐ BIG table number or service type + Pickup time underneath -->
+        <div class="ticket-table">
+          <div class="ticket-table-main">
+            ${getTicketTableLabel(orderObj)}
+          </div>
+
+          ${
+            // Only show pickup line if we actually have a pickup time (stored in channel)
+            orderObj.channel
+              ? `<div class="ticket-pickup">Pickup ${orderObj.channel}</div>`
+              : ''
+          }
+        </div>
+
+          <!-- ⭐ small meta block (order#, time, type) -->
+          <div class="ticket-meta">
+            <div class="order-number">${orderObj.orderNumber || ''}</div>
+            <div class="ticket-time">${orderObj.time}</div>
+          </div>
+
+        </div>
+        <div class="ticket-body">
+          ${
+           orderObj.foodItems
+             .map((item, idx) => renderTicketItemLine(item, orderObj.id, idx, 'food'))
+             .join('')
+           }
+         </div>
+       </div>
+    `;
+  });
+
+  wrap.innerHTML = html || '<p style="text-align:center;color:#999;">No kitchen orders</p>';
+}
+
+// ----------------------
+// Bar view (drinks only)
+// ----------------------
+function renderBarView() {
+  const wrap = document.getElementById('bar-orders');
+  if (!wrap) return;
+
+  let html = '';
+
+  kitchenOrders.forEach(orderObj => {
+    if (!orderObj.drinkItems || !orderObj.drinkItems.length) return;
+
+const ticketClass =
+  orderObj.serviceType === 'deliveroo' ? 'ticket ticket-deliveroo' :
+  orderObj.serviceType === 'justeat'   ? 'ticket ticket-justeat'   :
+  orderObj.serviceType === 'takeaway'    ? 'ticket ticket-takeaway'    :
+  orderObj.serviceType === 'phone'       ? 'ticket ticket-phone'       :
+  'ticket';
+
+    html += `
+      <div class="${ticketClass}">
+        <div class="ticket-header">
+
+        <!-- ⭐ BIG table number or service type + Pickup time under it -->
+        <div class="ticket-table">
+          <div class="ticket-table-main">
+            ${getTicketTableLabel(orderObj)}
+          </div>
+
+          ${
+            orderObj.channel
+              ? `<div class="ticket-pickup">Pickup ${orderObj.channel}</div>`
+              : ''
+          }
+        </div>
+
+          <!-- ⭐ small meta block (order#, time, type) -->
+          <div class="ticket-meta">
+            <div class="order-number">${orderObj.orderNumber || ''}</div>
+            <div class="ticket-time">${orderObj.time}</div>
+          </div>
+
+        </div>
+        <div class="ticket-body">
+          ${
+            orderObj.drinkItems
+             .map((item, idx) => renderTicketItemLine(item, orderObj.id, idx, 'drink'))
+             .join('')
+           }
+        </div>
+       </div>
+    `;
+  });
+
+  wrap.innerHTML = html || '<p style="text-align:center;color:#999;">No bar orders</p>';
+}
+
+// ----------------------
+// ALL ORDERS view (overview, NO complete buttons)
+// + Retrieve button for archived orders
+// ----------------------
+function renderAllOrdersView() {
+  const wrap = document.getElementById('all-orders');
+  if (!wrap) return;
+
+  let html = '';
+
+function getTicketClass(orderObj) {
+  if (orderObj.serviceType === 'deliveroo') return 'ticket ticket-deliveroo';
+  if (orderObj.serviceType === 'justeat')   return 'ticket ticket-justeat';
+  if (orderObj.serviceType === 'takeaway')    return 'ticket ticket-takeaway';
+  if (orderObj.serviceType === 'phone')       return 'ticket ticket-phone';
+  return 'ticket';
+}
+
+  function renderStatusBadgeType(orderObj) {
+    return orderObj.serviceType === 'dine-in'  ? '堂食' :
+           orderObj.serviceType === 'takeaway'   ? '現場外賣'  :
+           orderObj.serviceType === 'phone'      ? '電話外賣' :
+           orderObj.serviceType === 'deliveroo'? 'Deliveroo' :
+           orderObj.serviceType === 'justeat'  ? 'Just Eat' :
+           orderObj.serviceType || '';
+  }
+
+    function renderOverviewCard(orderObj, statusLabel, isArchived) {
+    const allItems = [];
+
+    (orderObj.foodItems || []).forEach((item, idx) => {
+      allItems.push({ item, kind: 'food', index: idx });
+    });
+    (orderObj.drinkItems || []).forEach((item, idx) => {
+      allItems.push({ item, kind: 'drink', index: idx });
+    });
+
+    if (!allItems.length) return '';
+
+    const isPendingPay = (orderObj.paymentStatus === 'pending');
+
+    // ✅ Only show badge when unpaid.
+    //    Paid orders get NO badge at all.
+    const paymentBadge = isPendingPay
+      ? `<span class="badge badge-pending">待付款</span>`
+      : '';
+
+    // ✅ Pay button also only for unpaid orders.
+      const payBtnHtml = isPendingPay
+        ? `<button type="button" class="pay-pending-btn" data-order-id="${orderObj.id}">Pay</button>`
+        : '';
+
+      const itemsHtml = allItems.map(entry => {
+        const it   = entry.item;
+      const kind = entry.kind;
+      const idx  = entry.index;
+
+      const modsArray = Array.isArray(it.mods) ? it.mods : [];
+      const modsHtml = modsArray.length
+        ? `<div class="ticket-mods">${modsArray.join(', ')}</div>`
+        : '';
+
+      let name = it.displayName || '';
+      if (it.isSetMeal) name += ' <span class="blue">餐</span>';
+
+      const isComplete = it.status === 'complete';
+      const itemClass = isComplete ? 'ticket-item done' : 'ticket-item';
+
+      const retrieveBtnHtml = isComplete
+        ? `<button
+             type="button"
+             class="retrieve-btn"
+             data-order-id="${orderObj.id}"
+             data-kind="${kind}"
+             data-index="${idx}"
+             data-archived="${isArchived ? '1' : '0'}"
+           >Retrieve</button>`
+        : '';
+
+      const editBtnHtml = (!isArchived)
+        ? `
+          <button
+            type="button"
+            class="edit-btn ticket-edit-btn"
+            title="Edit"
+            data-ticket-id="${orderObj.id}"
+            data-kind="${kind}"
+            data-index="${idx}"
+            data-archived="0"
+          >
+            <i class="fas fa-pen"></i>
+          </button>
+        `
+        : '';
+
+      return `
+        <div class="${itemClass}">
+          <div class="ticket-item-main">
+            <div class="ticket-item-name">${name}</div>
+            ${modsHtml}
+          </div>
+          <div class="ticket-item-actions">
+            ${editBtnHtml}
+            ${retrieveBtnHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  return `
+    <div class="${getTicketClass(orderObj)}">
+      <div class="ticket-header">
+
+        <!-- LEFT SIDE: Title + Pay button + Pickup under title -->
+        <div class="ticket-table">
+          <!-- first row: title + Pay button -->
+          <div class="ticket-table-main-row">
+            <span class="ticket-table-main">
+              ${getTicketTableLabel(orderObj)}
+            </span>
+            ${payBtnHtml}
+          </div>
+
+          <!-- second row: pickup time under title (only if exists) -->
+          ${
+            orderObj.channel
+              ? `<div class="ticket-pickup">Pickup ${orderObj.channel}</div>`
+              : ''
+          }
+        </div>
+
+        <!-- ⭐ right-side meta (order#, status, payment, time) -->
+        <div class="ticket-meta">
+          <div class="order-number">${orderObj.orderNumber || ''}</div>
+          <div>
+            <span class="badge">${statusLabel}</span>
+            <!-- ❌ removed small Pickup badge here to avoid duplication -->
+            <!-- ${orderObj.channel ? `<span class="badge">Pickup ${orderObj.channel}</span>` : ''} -->
+          </div>
+          <div>
+            ${paymentBadge}
+          </div>
+          <div class="ticket-time">${orderObj.time || ''}</div>
+        </div>
+
+      </div>
+
+      <div class="ticket-body">
+        ${itemsHtml}
+      </div>
+    </div>
+  `;
+  }
+
+  // Active (still in kitchenOrders)
+  // 🔁 Show newest first by reversing a copy of the array
+  kitchenOrders.slice().reverse().forEach(o => {
+    html += renderOverviewCard(o, 'In progress', false);
+  });
+
+  // Fully completed / archived
+  // 🔁 Same idea: latest completed at the top of the completed section
+  archivedOrders.slice().reverse().forEach(o => {
+    html += renderOverviewCard(o, 'Completed', true);
+  });
+
+  wrap.innerHTML = html || '<p style="text-align:center;color:#999;">No orders</p>';
+}
+
+function bucketFromCategory(cat) {
+  const c = String(cat || '');
+  if (c.includes('飲品')) return 'drink';
+  if (c.includes('小食')) return 'snack';
+  return 'food';
+}
+
+function buildBucketPivot(itemRows) {
+  const buckets = { food: [], drink: [], snack: [] };
+
+  itemRows.forEach(r => {
+    const b = bucketFromCategory(r.category);
+    buckets[b].push(r);
+  });
+
+  // Sort each bucket by qty desc
+  Object.keys(buckets).forEach(k => {
+    buckets[k].sort((a, b) => b.qty - a.qty);
+  });
+
+  return buckets;
+}
+
+function renderAdminView() {
+  const wrap = document.getElementById('admin-summary');
+  if (!wrap) return;   // ✅ only check that the admin container exists
+
+  // ✅ Always use TODAY as the selected date (local time)
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const selected = `${yyyy}-${mm}-${dd}`;
+
+  // filter by paidAt date (local) for TODAY only
+  const todays = completedOrders.filter(o => {
+    const iso = o.paidAt || o.createdAt || '';
+    if (!iso) return false;
+    const d = new Date(iso);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}` === selected;
+  });
+
+  // ✅ Build item pivot: { "item name": { qty, amount } }
+const itemMap = new Map();
+
+todays.forEach(o => {
+  const items = Array.isArray(o.items) ? o.items : [];
+  items.forEach(it => {
+    const key = (it.name || '').trim();
+    if (!key) return;
+
+    const prev = itemMap.get(key) || { qty: 0, amount: 0, category: it.category || '' };
+    prev.qty += 1;
+    prev.amount += (Number(it.amount || 0) || 0);
+    if (!prev.category && it.category) prev.category = it.category;
+    itemMap.set(key, prev);
+  });
+});
+
+// turn into sorted array (most sold first)
+const itemRows = Array.from(itemMap.entries())
+  .map(([name, v]) => ({ name, qty: v.qty, amount: v.amount, category: v.category || '' }))
+  .sort((a, b) => b.qty - a.qty);
+
+const buckets = buildBucketPivot(itemRows);
+
+  const sum = {
+    cash: 0,
+    card: 0,
+    deliveroo: 0,
+    justeat: 0,
+    total: 0
+  };
+
+  todays.forEach(o => {
+    const amt = Number(o.total || 0) || 0;
+    sum.total += amt;
+
+    const m = (o.paymentMethod || '').toLowerCase();
+    if (m === 'cash') sum.cash += amt;
+    else if (m === 'card') sum.card += amt;
+    else if (m === 'deliveroo') sum.deliveroo += amt;
+    else if (m === 'justeat') sum.justeat += amt;
+  });
+
+wrap.innerHTML = `
+  <!-- ===== Summary cards ===== -->
+  <div class="ticket-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px;">
+    <div class="ticket">
+      <div class="ticket-header">Cash</div>
+      <div class="ticket-body"><strong>£${sum.cash.toFixed(2)}</strong></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-header">Card</div>
+      <div class="ticket-body"><strong>£${sum.card.toFixed(2)}</strong></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-header">Deliveroo</div>
+      <div class="ticket-body"><strong>£${sum.deliveroo.toFixed(2)}</strong></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-header">Just Eat</div>
+      <div class="ticket-body"><strong>£${sum.justeat.toFixed(2)}</strong></div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-header">Total</div>
+      <div class="ticket-body"><strong>£${sum.total.toFixed(2)}</strong></div>
+    </div>
+  </div>
+
+  <!-- ===== Today’s Item Sales (FULL WIDTH, BELOW GRID) ===== -->
+  <!-- ===== Today’s Item Sales (TABLES ONLY) ===== -->
+  <div class="ticket" style="margin-top:16px;">
+    <div class="ticket-header"><strong>Today’s Item Sales</strong></div>
+    <div class="ticket-body">
+
+      ${itemRows.length ? `
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:16px;">
+
+          <!-- Food -->
+          <div>
+            <div style="font-weight:800; margin-bottom:8px;">Food</div>
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; font-weight:700; border-bottom:1px solid #ddd; padding-bottom:6px;">
+              <div>Item</div><div>Qty</div><div>£</div>
+            </div>
+            ${buckets.food.map(r => `
+              <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+                <div>${r.name}</div>
+                <div>${r.qty}</div>
+                <div>£${r.amount.toFixed(2)}</div>
+              </div>
+            `).join('') || `<div style="color:#777; padding:8px 0;">No food items</div>`}
+          </div>
+
+          <!-- Drinks -->
+          <div>
+            <div style="font-weight:800; margin-bottom:8px;">Drinks</div>
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; font-weight:700; border-bottom:1px solid #ddd; padding-bottom:6px;">
+              <div>Item</div><div>Qty</div><div>£</div>
+            </div>
+            ${buckets.drink.map(r => `
+              <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+                <div>${r.name}</div>
+                <div>${r.qty}</div>
+                <div>£${r.amount.toFixed(2)}</div>
+              </div>
+            `).join('') || `<div style="color:#777; padding:8px 0;">No drink items</div>`}
+          </div>
+
+          <!-- Snacks -->
+          <div>
+            <div style="font-weight:800; margin-bottom:8px;">Snacks</div>
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; font-weight:700; border-bottom:1px solid #ddd; padding-bottom:6px;">
+              <div>Item</div><div>Qty</div><div>£</div>
+            </div>
+            ${buckets.snack.map(r => `
+              <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+                <div>${r.name}</div>
+                <div>${r.qty}</div>
+                <div>£${r.amount.toFixed(2)}</div>
+              </div>
+            `).join('') || `<div style="color:#777; padding:8px 0;">No snack items</div>`}
+          </div>
+
+        </div>
+      ` : `
+        <div style="color:#777;">No paid orders for this date.</div>
+      `}
+
+    </div>
+  </div>
+
+  <p style="color:#666;margin-top:10px;">
+    Orders counted: <strong>${todays.length}</strong>
+  </p>
+`;
+}
+
+// ----------------------
+// Kitchen/bar Complete button handler
+// ----------------------
+async function handleTicketClick(e) {
+  const btn = e.target.closest('.ticket-status-btn');
+  if (!btn) return;
+
+  const orderId = Number(btn.dataset.orderId);
+  const index   = Number(btn.dataset.index);
+  const kind    = btn.dataset.kind;
+
+  if (!orderId || Number.isNaN(index)) return;
+
+  const orderObj = kitchenOrders.find(o => o.id === orderId);
+  if (!orderObj) return;
+
+  const items = (kind === 'food') ? orderObj.foodItems : orderObj.drinkItems;
+  const item  = items[index];
+  if (!item) return;
+
+  // Toggle status
+  item.status = (item.status === 'complete') ? 'in-progress' : 'complete';
+
+  // 2️⃣ Maybe move/remove ticket if everything done
+  // (your existing logic here)
+
+  // 3️⃣ 🔄 Sync to Supabase
+  await saveTicketItemsToSupabase(orderObj);
+
+  const allFoodDone  = !orderObj.foodItems.length || orderObj.foodItems.every(i => i.status === 'complete');
+  const allDrinkDone = !orderObj.drinkItems.length || orderObj.drinkItems.every(i => i.status === 'complete');
+
+// If everything is complete → move order to archivedOrders and stamp completion time
+if (allFoodDone && allDrinkDone) {
+  const completionTime = new Date().toISOString();
+
+  // remove from active
+  kitchenOrders = kitchenOrders.filter(o => o.id !== orderId);
+
+  // store in archivedOrders with completion timestamp
+  orderObj.completedAt = completionTime;
+  archivedOrders.push(orderObj);
+
+  // also attach completion time to completedOrders entry for CSV
+  const summary = completedOrders.find(o => o.id === orderId);
+  if (summary) {
+    summary.completedAt = completionTime;
+  }
+}
+
+  // 🔄 Now sync to Supabase (items + maybe completed_at)
+  await saveTicketItemsToSupabase(orderObj);
+
+  renderKitchenView();
+  renderBarView();
+  renderAllOrdersView();
+}
+
+// kitchen & bar listen for Complete/Done
+document.getElementById('kitchen-orders').addEventListener('click', handleTicketClick);
+document.getElementById('bar-orders').addEventListener('click', handleTicketClick);
+
+// All orders click delegation: Pay (whole order) + Retrieve (per item)
+document.getElementById('all-orders').addEventListener('click', async e => {
+
+  // ✅ EDIT (per item) in All Orders
+  const editBtn = e.target.closest('.ticket-edit-btn');
+  if (editBtn) {
+    const orderId = Number(editBtn.dataset.ticketId);
+    const index = Number(editBtn.dataset.index);
+    const kind = editBtn.dataset.kind; // 'food' or 'drink'
+    const isArchived = editBtn.dataset.archived === '1';
+
+    if (!orderId || Number.isNaN(index)) return;
+
+    const collection = isArchived ? archivedOrders : kitchenOrders;
+    const ticket = collection.find(o => o.id === orderId);
+    if (!ticket) return;
+
+    const items = (kind === 'food') ? ticket.foodItems : ticket.drinkItems;
+    const it = items[index];
+    if (!it) return;
+
+    // remember what we are editing (so modal saves back to ticket item)
+    editingTicketItem = { ticketId: ticket.id, lane: kind, index };
+
+    // find matching menu item to open correct option groups
+    let menuIndex = (typeof it.menuIndex === 'number') ? it.menuIndex : -1;
+    if (menuIndex < 0) {
+      const baseName = (it.displayName || '').replace(/^(熱|凍)/, '');
+      menuIndex = menu.findIndex(m => m.name === baseName);
+    }
+    if (menuIndex < 0) {
+      alert('Cannot edit this item (no matching menu entry found).');
+      editingTicketItem = null;
+      return;
+    }
+
+    // open the SAME modal you already use
+    editingOrderItemIndex = null; // important: do NOT edit current POS order[]
+    openModal(menu[menuIndex], menuIndex);
+    return;
+  }  
+
+// ✅ PAY (whole order)
+  const payBtn = e.target.closest('.pay-pending-btn');
+  if (payBtn) {
+    const orderId = Number(payBtn.dataset.orderId);
+    if (!orderId) return;
+
+    const ticket = findTicketById(orderId);
+    if (!ticket) return;
+
+    // Load ticket into POS for cashier to take payment
+    order = [
+      ...(ticket.foodItems || []),
+      ...(ticket.drinkItems || [])
+    ].map(it => ({
+      ...it,
+      mods: Array.isArray(it.mods) ? it.mods : [],
+      final: Number(it.final ?? it.price ?? 0)
+    }));
+
+    payingOrderId = ticket.id;
+
+    // Switch to POS tab
+    document.querySelector('[data-tab="pos-view"]').click();
+
+    isCash = false;
+    updateOrder();
+    renderCustomerView();
+    return; // IMPORTANT: stop here so it doesn't run Retrieve logic
+  }
+
+  // ✅ RETRIEVE (per item)
+  const btn = e.target.closest('.retrieve-btn');
+  if (!btn) return;
+
+  const orderId = Number(btn.dataset.orderId);
+  const index = Number(btn.dataset.index);
+  const kind = btn.dataset.kind;
+  const isArchived = btn.dataset.archived === '1';
+
+  if (!orderId || Number.isNaN(index)) return;
+
+  // 🔍 Pick the correct collection (archived vs active)
+  const collection = isArchived ? archivedOrders : kitchenOrders;
+  const orderObj   = collection.find(o => o.id === orderId);
+  if (!orderObj) return;
+
+  const items = (kind === 'food') ? orderObj.foodItems : orderObj.drinkItems;
+  const item = items[index];
+  if (!item) return;
+
+  item.status = 'in-progress';
+
+  // If it was archived, move it back to active kitchenOrders
+  if (isArchived) {
+    archivedOrders = archivedOrders.filter(o => o.id !== orderId);
+    kitchenOrders.push(orderObj);
+  }
+
+  // 3️⃣ IMPORTANT: push the new item statuses back to Supabase,
+  //    otherwise the 5-second poll will reload the old "complete" value
+  //    and your Retrieve will get undone.
+  await saveTicketItemsToSupabase(orderObj);
+
+  // 4️⃣ Re-render all boards with the updated state
+  renderKitchenView();
+  renderBarView();
+  renderAllOrdersView();
+});
+
+// ----------------------
+// CSV EXPORT
+// ----------------------
+function formatDateForCsv(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}/${mm}/${dd}`;
+}
+
+function formatTimeForCsv(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function mapTypeLabel(serviceType) {
+  return serviceType === 'dine-in'  ? '堂食' :
+         serviceType === 'takeaway'   ? '現場外賣' :
+         serviceType === 'phone'      ? '電話外賣' :
+         serviceType === 'deliveroo'? 'Deliveroo' :
+         serviceType === 'justeat'  ? 'Just Eat' :
+         serviceType || '';
+}
+
+function mapPaymentLabel(method) {
+  if (!method) return '';
+  method = String(method).toLowerCase();
+  if (method === 'cash') return 'Cash';
+  if (method === 'card') return 'Card';
+  if (method === 'deliveroo') return 'Deliveroo';
+  if (method === 'justeat') return 'Just Eat';
+  return method;
+}
+
+function exportCsv() {
+  if (!completedOrders.length) {
+    alert('No completed orders to export yet.');
+    return;
+  }
+
+  const header = [
+    'Order #',
+    'Type',
+    'Date (YY/MM/DD)',
+    'Time (HH:MM)',
+    'Complete time (HH:MM)',
+    'Payment method',
+    'Amount'
+  ];
+
+  const rows = [[
+   'Order #',
+   'Type',
+   'Date (YY/MM/DD)',
+   'Food item',
+   'Category',
+   'Time (HH:MM)',
+   'Complete time (HH:MM)',
+   'Payment method',
+   'Amount'
+ ]];
+
+completedOrders.forEach(o => {
+  const items = Array.isArray(o.items) ? o.items : [];
+
+  // If somehow an old record has no items, you can skip or output a blank line
+  if (!items.length) return;
+
+  items.forEach(it => {
+    rows.push([
+      o.orderNumber || '',
+      o.serviceType || '',
+      formatDateForCsv(o.paidAt || o.createdAt || ''),
+      it.name || '',
+      it.category || '',
+      formatTimeForCsv(o.createdAt || ''),
+      formatTimeForCsv(o.completedAt || ''),
+      o.paymentMethod || '',
+      (Number(it.amount || 0) || 0).toFixed(2)
+    ]);
+  });
+});
+
+  const csvContent = rows
+    .map(cols =>
+      cols
+        .map(val => `"${String(val).replace(/"/g, '""')}"`)
+        .join(',')
+    )
+    .join('\r\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'orders.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// Export button listener
+const exportBtn = document.getElementById('export-csv-btn');
+if (exportBtn) {
+  exportBtn.addEventListener('click', exportCsv);
+}
+
+function createUnpaidTicketFromCurrentOrder() {
+  if (!order.length) {
+    alert('No items in the order.');
+    return;
+  }
+  if (!canUnpaidOrder()) {
+    alert('Unpaid is only for Dine-in / Takeaway / Phone orders.');
+    return;
+  }
+
+  // Unpaid should NOT apply cash discount
+  isCash = false;
+  updateOrder();
+
+  const orderNumberInput = document.getElementById('order-number');
+  const pickupInput = document.getElementById('pickup-time');
+
+  const rawTable = orderNumberInput ? orderNumberInput.value.trim() : '';
+
+  const serviceType = orderTypeSelect ? orderTypeSelect.value : 'dine-in';
+
+  // 🔎 read pickup time (could be empty string)
+  const pickupTime = pickupInput ? pickupInput.value.trim() : '';
+
+  // ⛔ Require table for dine-in orders
+  if (serviceType === 'dine-in' && !rawTable) {
+    alert('請選擇枱號.');
+    return;
+  }
+
+  // ⛔ NEW RULE: Deliveroo / JustEat / phone must have pickup time
+  if (
+    (serviceType === 'deliveroo' ||
+     serviceType === 'justeat'   ||
+     serviceType === 'phone') &&
+    !pickupTime
+  ) {
+    alert('請輸入取餐時間.');
+    return; // ❗ stop here – DO NOT send order to kitchen/bar/all-orders
+  }
+
+  // 🟢 TABLE number used by the Kitchen/Bar header logic
+  const tableNumber = (serviceType === 'dine-in') ? rawTable : '';
+
+  //     Keep this consistent with paid orders
+  const orderNumber = '';   // Supabase will fill this later
+
+  let channel = pickupInput ? pickupInput.value.trim() : '';
+  if (channel.length >= 5) channel = channel.slice(0, 5);
+
+  const now = new Date();
+  const createdAt = now.toISOString();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  const orderId = now.getTime();
+
+  const foodCats = ['咖喱系列', '茶記粉面', '主食', '小食'];
+
+  const foodItems = order
+    .filter(item => foodCats.includes(item.cat))
+    .map(item => ({ ...item, status: 'in-progress' }));
+
+  const drinkItems = order
+    .filter(item => item.cat === '飲品')
+    .map(item => ({ ...item, status: 'in-progress' }));
+
+  const ticket = {
+    id: orderId,
+    orderNumber,
+    tableNumber,
+    serviceType,
+    channel,
+    time: timeStr,
+    createdAt,
+
+    paymentStatus: 'pending',
+    paymentMethod: null,
+    paidAt: null,
+
+    amount: lastFinalTotal, // snapshot total for later payment/CSV
+    foodItems,
+    drinkItems
+  };
+
+  // 🧾 Add to local kitchen board
+  kitchenOrders.push(ticket);
+
+  // 🌐 NEW: also save this unpaid ticket into Supabase.
+  //     - payment_status will be "pending"
+  //     - this ensures the 5s reload sees the order and keeps it visible
+  //     - we do NOT await here so the POS stays responsive
+  if (typeof saveOrderToSupabase === 'function') {
+    saveOrderToSupabase(ticket);
+  }
+
+  // clear POS
+  order = [];
+  isCash = false;
+  payingOrderId = null;
+  updateOrder();
+
+  if (orderNumberInput) orderNumberInput.value = '';
+  if (pickupInput) pickupInput.value = '';
+
+  // ⭐ Reset back to 堂食 and clear table highlight
+  resetServiceTypeAndTable();
+
+  renderKitchenView();
+  renderBarView();
+  renderAllOrdersView();
+}
+
+// Reset service type back to default (dine-in) + table buttons + toggle buttons
+function resetServiceTypeAndTable() {
+  if (typeof orderTypeSelect !== 'undefined' && orderTypeSelect) {
+    // 1) set back to 堂食
+    orderTypeSelect.value = 'dine-in';
+
+    // 2) 🔁 trigger the same logic as if the user changed it manually
+    //    (this will re-enable Cash / Card / Unpaid buttons)
+    const evt = new Event('change', { bubbles: true });
+    orderTypeSelect.dispatchEvent(evt);
+  }
+
+  // 3) Re-enable table buttons + clear selection
+  setTableButtonsEnabled(true);
+  resetTableSelection();
+}
+
+function findTicketById(orderId) {
+  return kitchenOrders.find(o => o.id === orderId) || archivedOrders.find(o => o.id === orderId) || null;
+}
+
+// 🧾 Pay an EXISTING ticket (e.g. previously Unpaid)
+async function payExistingTicket(method, overrideTotal = null) {
+  const ticket = findTicketById(payingOrderId);
+  if (!ticket) {
+    payingOrderId = null;
+    return;
+  }
+
+  // 1️⃣ Mark as paid in local memory (so UI updates immediately)
+  ticket.paymentStatus = 'paid';
+  ticket.paymentMethod = method;
+  ticket.paidAt = new Date().toISOString();
+
+  // Use overrideTotal if provided; otherwise use existing ticket.amount or lastFinalTotal
+  const paidTotal = (typeof overrideTotal === 'number')
+    ? overrideTotal
+    : (ticket.amount ?? lastFinalTotal);
+
+  // Keep the ticket's amount in sync with what we actually charged
+  ticket.amount = paidTotal;
+
+  // 2️⃣ NEW: Update payment info in Supabase so the 5s poll sees it as PAID,
+  //    not "pending" anymore. We don't need to await this for UI to feel instant,
+  //    but making this function async allows us to await if we want.
+  updatePaymentInSupabase(ticket);
+
+  // 3️⃣ Record in completedOrders (for admin / CSV etc.)
+  completedOrders.push({
+    id: ticket.id,
+    orderNumber: ticket.orderNumber,
+    serviceType: ticket.serviceType,
+    channel: ticket.channel,
+    createdAt: ticket.createdAt,
+    completedAt: ticket.completedAt || null,
+    paidAt: ticket.paidAt,
+    paymentMethod: ticket.paymentMethod,
+    total: paidTotal,
+    items: [
+      ...(ticket.foodItems || []),
+      ...(ticket.drinkItems || [])
+    ].map(it => ({
+      name: it.displayName || it.name || '',
+      category: it.cat || '',
+      amount: Number(it.final ?? it.price ?? 0) || 0
+    }))
+  });
+
+  // 4️⃣ Clear POS state
+  payingOrderId = null;
+  order = [];
+  isCash = false;
+  updateOrder();
+
+  if (payModal) payModal.style.display = 'none';
+
+  // 5️⃣ Re-render boards so payment badge updates to "Paid"
+  renderAllOrdersView();
+  renderKitchenView();
+  renderBarView();
+  if (adminUnlocked) renderAdminView();
+}
+
+function renderCustomerView() {
+  const wrap = document.getElementById('customer-screen');
+  if (!wrap) return;
+
+  const orderNumberInput = document.getElementById('order-number');
+  const pickupInput = document.getElementById('pickup-time');
+  const subtotal = order.length ? lastSubtotal : 0;
+  const baseTotal = order.length ? lastBaseTotal : 0;     // after combo discount
+  const finalTotal = order.length ? lastFinalTotal : 0;   // after cash discount (if cash)
+
+  const comboAValue = order.length ? (lastComboACount * 0.5) : 0;
+  const comboBValue = order.length ? (lastComboBCount * 1.0) : 0;
+
+  const comboDiscountTotal = order.length ? lastMealDealDiscount : 0;
+  const cashDiscountValue = (order.length && isCash) ? lastCashDiscount : 0;
+
+  const serviceType = orderTypeSelect ? orderTypeSelect.value : '';
+  const tableOrNo   = orderNumberInput ? orderNumberInput.value.trim() : '';
+
+  let pickup = pickupInput ? pickupInput.value.trim() : '';
+  if (pickup.length >= 5) pickup = pickup.slice(0,5);
+
+  const typeLabel =
+    serviceType === 'dine-in'  ? '堂食' :
+    serviceType === 'takeaway'   ? '現場外賣' :
+    serviceType === 'phone'      ? '電話外賣' :
+    serviceType === 'deliveroo'? 'Deliveroo' :
+    serviceType === 'justeat'  ? 'Just Eat' :
+    serviceType || '';
+
+  const meta = [];
+  if (typeLabel) meta.push(`Type: ${typeLabel}`);
+  if (tableOrNo) meta.push(`Table/Order: ${tableOrNo}`);
+  if (pickup) meta.push(`Pickup: ${pickup}`);
+
+  const itemsHtml = order.length
+    ? order.map(it => {
+        const mods = Array.isArray(it.mods) && it.mods.length
+          ? `<div class="customer-mods">${it.mods.map(m => escapeHtml(m)).join(', ')}</div>`
+          : '';
+        return `
+          <div class="customer-item">
+            <div>
+              <div><strong>${escapeHtml(it.displayName)}</strong></div>
+              ${mods}
+            </div>
+            <div>£${Number(it.final).toFixed(2)}</div>
+          </div>
+        `;
+      }).join('')
+    : `<div style="color:#777;">No items yet</div>`;
+
+  wrap.innerHTML = `
+    <div class="customer-title">請查看你的訂單 Here is your order</div>
+    <div class="customer-meta">
+      ${meta.map(x => `<span class="customer-pill">${escapeHtml(x)}</span>`).join('')}
+    </div>
+    <div class="customer-card">
+      ${itemsHtml}
+      <div class="customer-total">
+  <div>Base total</div>
+  <div>£${baseTotal.toFixed(2)}</div>
+</div>
+
+${comboAValue > 0 ? `
+<div class="customer-total" style="color:#d32f2f;">
+  <div>Combo A x${lastComboACount}</div>
+  <div>-£${comboAValue.toFixed(2)}</div>
+</div>` : ''}
+
+${comboBValue > 0 ? `
+<div class="customer-total" style="color:#d32f2f;">
+  <div>Combo B x${lastComboBCount}</div>
+  <div>-£${comboBValue.toFixed(2)}</div>
+</div>` : ''}
+
+${cashDiscountValue > 0 ? `
+<div class="customer-total" style="color:#d32f2f;">
+  <div>Cash 5%</div>
+  <div>-£${cashDiscountValue.toFixed(2)}</div>
+</div>` : ''}
+
+<hr style="margin:10px 0;">
+
+<div class="customer-total" style="font-size:26px;">
+  <div>Total</div>
+  <div>£${finalTotal.toFixed(2)}</div>
+</div>
+    </div>
+  `;
+}
+
+function renderPaymentOrderSummary() {
+  /*
+    This renders the SAME format as customer view
+    but inside the payment popup area.
+  */
+  const container = document.getElementById('payment-order-summary');
+  if (!container) return;
+
+  // reuse your existing order object
+  if (!order.length) {
+    container.innerHTML = '<p>No items.</p>';
+    return;
+  }
+
+  // You can copy the same HTML logic from renderCustomerView(),
+  // just output it into this container instead.
+  container.innerHTML = renderCustomerHTML(); // if you already have that helper
+}
+
+function renderWaitlist() {
+  const countEl = document.getElementById('wl-count');
+  const tbody = document.getElementById('waitlist-tbody');
+  const emptyEl = document.getElementById('wl-empty');
+
+  if (!tbody) return;
+
+  // Count
+  if (countEl) countEl.textContent = String(waitlist.length);
+
+  // Empty state
+  if (emptyEl) emptyEl.style.display = waitlist.length ? 'none' : 'block';
+
+  // Rows
+  tbody.innerHTML = '';
+
+  const now = Date.now();
+
+  waitlist.forEach((w, idx) => {
+    const mins = Math.max(0, Math.floor((now - w.time) / 60000));
+    const waitTimeText = mins < 1 ? '0 min' : `${mins} min`;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="wl-pos">${idx + 1}</td>
+      <td><strong>${escapeHtml(w.name)}</strong></td>
+      <td>${w.pax}</td>
+      <td>${waitTimeText}</td>
+      <td>
+        <div class="wl-actions">
+          <button type="button" class="wl-btn wl-btn-seat" data-seat="${idx}">入座</button>
+          <button type="button" class="wl-btn wl-btn-remove" data-remove="${idx}">移除</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ----------------------
+// STEP 7: Load today's orders from Supabase
+// ----------------------
+// This pulls orders for *today* from the `orders` table and rebuilds:
+// - kitchenOrders (all tickets with items still "in-progress")
+// - completedOrders (for Admin/CSV summaries)
+// - archivedOrders (we leave empty for now; it will be filled locally
+//   when the device marks an order fully completed).
+async function loadTodayOrdersFromSupabase() {
+  if (typeof supabaseClient === 'undefined') {
+    console.warn('Supabase client not found – loading with empty orders.');
+    kitchenOrders = [];
+    completedOrders = [];
+    archivedOrders = [];
+    return;
+  }
+
+  const { start, end } = getTodayRangeISO();
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('orders')
+      .select('*')
+      .gte('created_at', start)
+      .lt('created_at', end)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load today\'s orders from Supabase:', error.message);
+      kitchenOrders = [];
+      completedOrders = [];
+      archivedOrders = [];
+      return;
+    }
+
+    // Reset local state for today
+    kitchenOrders = [];
+    completedOrders = [];
+    archivedOrders = [];
+
+    (data || []).forEach(row => {
+      const createdAt = row.created_at || new Date().toISOString();
+      const paidAt    = row.paid_at   || createdAt;
+      const amount    = Number(row.amount || 0) || 0;
+
+      // Use the created_at timestamp as the numeric ticket id,
+      // so it matches the id we originally used when we created the ticket.
+      const orderId = Date.parse(createdAt) || Date.now();
+
+      const rawItems = Array.isArray(row.items) ? row.items : [];
+
+      // Rebuild food & drink arrays based on the saved item.category.
+      const foodItems = [];
+      const drinkItems = [];
+
+      rawItems.forEach(it => {
+        const cat = it.category || '';
+        const status = it.status || 'in-progress';
+        const mods = Array.isArray(it.mods) ? it.mods : [];
+        const menuIndex = (typeof it.menuIndex === 'number') ? it.menuIndex : null;
+        const isSetMeal = !!it.isSetMeal;
+
+        const base = {
+          displayName: it.name || '',
+          name: it.name || '',
+          cat,
+          final: Number(it.amount || 0) || 0,
+          mods,
+          isSetMeal,
+          status,
+          menuIndex
+        };
+
+        if (cat === '飲品' || cat.includes('飲品')) {
+          drinkItems.push(base);
+        } else {
+          foodItems.push(base);
+        }
+      });
+
+      const ticket = {
+        id: orderId,
+        supabaseId: row.id,   // ⭐ THIS LINE
+        orderNumber: row.order_number || '',
+        tableNumber: row.table_number   || '',
+        serviceType: row.service_type || 'dine-in',
+        channel: row.channel || '',
+        time: createdAt
+          ? new Date(createdAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            })
+          : '',
+        createdAt,
+
+        // 🧠 Use the real payment_status from Supabase
+        //     - 'pending'  → Unpaid ticket
+        //     - 'paid'     → normal paid order
+        paymentStatus: row.payment_status || 'paid',
+        paymentMethod: row.payment_method || null,
+        paidAt,
+        amount,
+        foodItems,
+        drinkItems
+      };
+
+      // Work out if everything on this ticket is already complete
+      const allFoodDone  = !foodItems.length || foodItems.every(i => i.status === 'complete');
+      const allDrinkDone = !drinkItems.length || drinkItems.every(i => i.status === 'complete');
+      const isFullyDone  = allFoodDone && allDrinkDone;
+
+      // For boards:
+      // - Kitchen & Bar should only see tickets that still have something to cook/pour
+      const hasAnyItems = foodItems.length > 0 || drinkItems.length > 0;
+
+      if (hasAnyItems && !isFullyDone) {
+        // still have at least one item NOT complete → show on Kitchen/Bar boards
+        kitchenOrders.push(ticket);
+      } else if (hasAnyItems && isFullyDone) {
+        // everything is done → treat as archived on this device
+        archivedOrders.push(ticket);
+      }
+
+      // For Admin & CSV export: we keep the summary in completedOrders.
+      completedOrders.push({
+        id: ticket.id,
+        orderNumber: ticket.orderNumber,
+        serviceType: ticket.serviceType,
+        channel: ticket.channel,
+        createdAt: ticket.createdAt,
+        completedAt: null,             // we don't sync item completion yet
+        paidAt: ticket.paidAt,
+        paymentMethod: ticket.paymentMethod,
+        total: ticket.amount,
+        items: rawItems.map(it => ({
+          name: it.name || '',
+          category: it.category || '',
+          amount: Number(it.amount || 0) || 0
+        }))
+      });
+
+      // NOTE:
+      // archivedOrders is intentionally left empty here.
+      // It will be populated when this specific device marks all items
+      // "done" in the kitchen/bar. Full cross-device sync of completion
+      // state would require storing per-item status in Supabase.
+    });
+  } catch (err) {
+    console.error('Unexpected error loading orders from Supabase:', err);
+    kitchenOrders = [];
+    completedOrders = [];
+    archivedOrders = [];
+  }
+}
+
+// ----------------------
+// STEP 6: Waitlist → Supabase
+// ----------------------
+// NOTE:
+// - We now store the waitlist in the Supabase `waitlist` table instead of localStorage.
+// - Table structure expected:
+//   id (bigint, PK, identity)
+//   name (text)
+//   pax (integer)
+//   created_at (timestamptz, default now())
+
+// Save the current `waitlist` array to Supabase.
+// Simple approach: clear the table then re-insert all rows.
+// Called after we add / seat / remove entries.
+async function saveWaitlist() {
+  // If Supabase is not available for some reason, fail silently
+  // so the POS doesn't break mid-service.
+  if (typeof supabaseClient === 'undefined') {
+    console.warn('Supabase client not found – skipping waitlist save.');
+    return;
+  }
+
+  try {
+    // 1) Clear existing rows.
+    // `neq('id', 0)` = delete all rows where id != 0 (i.e. everything).
+    const { error: deleteError } = await supabaseClient
+      .from('waitlist')
+      .delete()
+      .neq('id', 0);
+
+    if (deleteError) {
+      console.error('Failed to clear waitlist in Supabase:', deleteError.message);
+      return; // stop here – don’t insert if delete failed
+    }
+
+    // 2) If waitlist is empty now, we’re done.
+    if (!waitlist.length) {
+      return;
+    }
+
+    // 3) Insert all current entries.
+    const rows = waitlist.map(w => ({
+      name: w.name,
+      pax: w.pax,
+      // store the "time" as created_at so we can reconstruct wait minutes later
+      created_at: new Date(w.time).toISOString()
+    }));
+
+    const { error: insertError } = await supabaseClient
+      .from('waitlist')
+      .insert(rows);
+
+    if (insertError) {
+      console.error('Failed to save waitlist to Supabase:', insertError.message);
+    }
+  } catch (err) {
+    console.error('Unexpected Supabase error (waitlist save):', err);
+  }
+}
+
+// Load the waitlist from Supabase into the `waitlist` array.
+// Called once on startup.
+async function loadWaitlist() {
+  if (typeof supabaseClient === 'undefined') {
+    console.warn('Supabase client not found – loading empty waitlist.');
+    waitlist = [];
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('waitlist')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load waitlist from Supabase:', error.message);
+      waitlist = [];
+      return;
+    }
+
+    // Convert DB rows into the shape used by the UI:
+    // { name, pax, time: timestamp(ms) }
+    waitlist = (data || []).map(row => ({
+      name: row.name,
+      pax: row.pax,
+      time: row.created_at ? new Date(row.created_at).getTime() : Date.now()
+    }));
+  } catch (err) {
+    console.error('Unexpected Supabase error (waitlist load):', err);
+    waitlist = [];
+  }
+}
+
+// ----------------------
+// Waitlist history logging (optional, for analytics)
+// ----------------------
+// This logs every waitlist action into the `waitlist_history` table
+// without changing how the on-screen waitlist behaves.
+async function logWaitlistEvent(entry, action) {
+  if (typeof supabaseClient === 'undefined') return;
+
+  try {
+    const { error } = await supabaseClient
+      .from('waitlist_history')
+      .insert({
+        name: entry.name,
+        pax: entry.pax,
+        // when they were first added to the waitlist
+        created_at: entry.time ? new Date(entry.time).toISOString() : null,
+        action,                               // 'added' | 'seated' | 'removed'
+        action_at: new Date().toISOString()  // when this specific action happened
+      });
+
+    if (error) {
+      console.error('Failed to log waitlist event:', error.message);
+    }
+  } catch (err) {
+    console.error('Unexpected error logging waitlist event:', err);
+  }
+}
+
+document.getElementById('add-wait-btn')?.addEventListener('click', () => {
+  const name = document.getElementById('wait-name')?.value.trim();
+  const paxVal = document.getElementById('wait-pax')?.value;
+  const pax = parseInt(paxVal, 10);
+
+  if (!name || !paxVal || Number.isNaN(pax)) {
+    alert('請輸入姓名及人數');
+    return;
+  }
+
+  const entry = {
+    name,
+    pax,
+    time: Date.now()
+  };
+
+  waitlist.push(entry);
+
+  saveWaitlist();
+  renderWaitlist();
+
+  // 🔹 log that this person was added to the waitlist
+  logWaitlistEvent(entry, 'added');
+
+  document.getElementById('wait-name').value = '';
+  document.getElementById('wait-pax').value = '';
+});
+
+document.getElementById('waitlist-tbody')?.addEventListener('click', (e) => {
+  const seatBtn = e.target.closest('[data-seat]');
+  const removeBtn = e.target.closest('[data-remove]');
+
+  if (seatBtn) {
+    const idx = Number(seatBtn.dataset.seat);
+    if (!Number.isNaN(idx)) {
+      const [entry] = waitlist.splice(idx, 1);  // remove and keep the entry
+      saveWaitlist();
+      renderWaitlist();
+
+      // 🔹 log that this person was seated
+      if (entry) {
+        logWaitlistEvent(entry, 'seated');
+      }
+    }
+    return;
+  }
+
+  if (removeBtn) {
+    const idx = Number(removeBtn.dataset.remove);
+    if (!Number.isNaN(idx)) {
+      const [entry] = waitlist.splice(idx, 1);  // remove and keep the entry
+      saveWaitlist();
+      renderWaitlist();
+
+      // 🔹 log that this person was removed (no-show / cancelled)
+      if (entry) {
+        logWaitlistEvent(entry, 'removed');
+      }
+    }
+  }
+});
+
+// 🔄 Update payment info in Supabase for an existing order
+// - Sets payment_status to 'paid'
+// - Saves payment_method, paid_at, and amount
+async function updatePaymentInSupabase(ticket) {
+  // If Supabase is not available, just log and skip
+  if (typeof supabaseClient === 'undefined') {
+    console.warn('Supabase client not found – skipping payment update.');
+    return;
+  }
+
+  // Build the fields we want to update in the DB
+  const payload = {
+    payment_status: ticket.paymentStatus,  // 'paid' / 'pending'
+    payment_method: ticket.paymentMethod,  // 'cash' / 'card' / etc.
+    paid_at:        ticket.paidAt,
+    amount:         ticket.amount
+  };
+
+  try {
+    // Prefer updating by Supabase row id if we have it (loaded from DB)
+    let query = supabaseClient
+      .from('orders')
+      .update(payload);
+
+    if (ticket.supabaseId) {
+      // ✅ Case 1: ticket came from Supabase and we know its row id
+      query = query.eq('id', ticket.supabaseId);
+    } else {
+      // ✅ Case 2: ticket was just inserted (Unpaid) and we don't yet have supabaseId
+      // Fallback: use order_number as a unique identifier
+      query = query.eq('order_number', ticket.orderNumber);
+    }
+
+    const { error } = await query;
+    if (error) {
+      console.error('Failed to update payment in Supabase:', error.message);
+    }
+  } catch (err) {
+    console.error('Unexpected error while updating payment in Supabase:', err);
+  }
+}
+
+// Initial render
+// We wrap startup in an async IIFE so we can await data (waitlist + today's
+// orders from Supabase) before drawing the UI on ANY device.
+(async function init() {
+  // 1) Load waitlist from Supabase so the Waitlist tab is correct.
+  await loadWaitlist();
+  // 2) load TODAY'S orders from Supabase
+  await loadTodayOrdersFromSupabase();
+
+  // 3) THEN render UI
+  renderMenu();
+  updateOrder();
+  renderKitchenView();
+  renderBarView();
+  renderAllOrdersView();
+  renderCustomerView();
+  renderWaitlist();
+  applyTabAccessMode();
+
+  // ⭐ wire up the table buttons
+  initTableButtons();
+
+  // RESTORE THE LAST ACTIVE TAB HERE
+  let savedTab = localStorage.getItem('lionrock_pos_active_tab') || 'pos-view';
+  switchToView(savedTab);
+
+  // 🔁 POLLING: refresh boards every 5 seconds
+  setInterval(async () => {
+    await loadTodayOrdersFromSupabase();
+    renderKitchenView();
+    renderBarView();
+    renderAllOrdersView();
+    renderCustomerView();
+    if (adminUnlocked) renderAdminView();
+  }, 5000); // 5000ms = 5 seconds
+})();
+
+// ===== Auto-update wait time every minute (Waitlist tab) =====
+setInterval(() => {
+  const wlView = document.getElementById('waitlist-view');
+  if (wlView && wlView.style.display !== 'none') {
+    renderWaitlist();
+  }
+}, 60000);
+</script>
+</body>
+</html>
