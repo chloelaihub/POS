@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>獅子山 Lion Rock POS — Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">  
+
+  <!-- Supabase (same as your POS file) -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    // NOTE: This is the same browser "anon" key you already use in lionrockpos.html
+    // IMPORTANT SECURITY NOTE:
+    // - This page is "hidden by URL" + password prompt only.
+    // - For REAL security, use Supabase Auth + RLS so only admin accounts can read orders.
+    const supabaseUrl = 'https://thmsnrncktwoajgclywa.supabase.co';
+    const supabaseKey = 'sb_publishable_M1wpHSIK_pE55Y7-MBgSmQ_CRs0oj2C';
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+    // Simple admin password gate (same password you used in POS)
+    // You can change it here without touching kitchen POS.
+    const ADMIN_PASSWORD = '6575';
+  </script>
+</head>
+
+<body>
+  <!-- ✅ Header (matches POS look using your existing export-btn class + your inline bar style) -->
+  <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;background:#f0f2f5;border-bottom:1px solid #ddd;">
+    <div style="display:flex;gap:10px;align-items:center;">
+      <strong>Daily Sales</strong>
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <button id="refresh-btn" type="button" class="export-btn">Refresh</button>
+      <button id="export-csv-btn" type="button" class="export-btn">Export CSV</button>
+    </div>
+  </div>
+
+  <!-- ✅ Admin content target -->
+  <div id="admin-summary" style="padding:16px;"></div>
+
+  <script>
+    // ----------------------
+    // State
+    // ----------------------
+    let completedOrders = [];
+
+    // ----------------------
+    // Date helpers: "today" range in ISO for Supabase
+    // ----------------------
+    function getTodayRangeISO() {
+      const now = new Date();
+
+      // Local midnight today
+      const startLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+
+      // Local midnight tomorrow
+      const endLocal = new Date(startLocal.getTime() + 24 * 60 * 60 * 1000);
+
+      return { start: startLocal.toISOString(), end: endLocal.toISOString() };
+    }
+
+    // ----------------------
+    // Load today's orders from Supabase
+    // ----------------------
+    async function loadTodayOrdersFromSupabase() {
+      const { start, end } = getTodayRangeISO();
+
+      const { data, error } = await supabaseClient
+        .from('orders')
+        .select('*')
+        .gte('created_at', start)
+        .lt('created_at', end)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Failed to load today orders:', error.message);
+        completedOrders = [];
+        return;
+      }
+
+      completedOrders = (data || []).map(row => {
+        const createdAt = row.created_at || new Date().toISOString();
+        const paidAt = row.paid_at || createdAt;
+        const rawItems = Array.isArray(row.items) ? row.items : [];
+
+        return {
+          id: row.id,
+          orderNumber: row.order_number || '',
+          serviceType: row.service_type || '',
+          channel: row.channel || '',
+          createdAt,
+          completedAt: row.completed_at || null,
+          paidAt,
+          paymentMethod: row.payment_method || '',
+          total: Number(row.amount || 0) || 0,
+          items: rawItems.map(it => ({
+            name: it.name || '',
+            category: it.category || '',
+            amount: Number(it.amount || 0) || 0
+          }))
+        };
+      });
+    }
+
+    // ----------------------
+    // CSV helpers
+    // ----------------------
+    function formatDateForCsv(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const yy = String(d.getFullYear()).slice(-2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yy}/${mm}/${dd}`;
+    }
+
+    function formatTimeForCsv(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return `${hh}:${mm}`;
+    }
+
+    function exportCsv() {
+      const paidOrders = completedOrders.filter(o => (o.paymentMethod || '').toString().trim() !== '');
+      if (!paidOrders.length) {
+        alert('No paid orders to export yet.');
+        return;
+      }
+
+      const rows = [[
+        'Order #','Type','Date (YY/MM/DD)','Food item','Category',
+        'Time (HH:MM)','Complete time (HH:MM)','Payment method','Amount'
+      ]];
+
+      paidOrders.forEach(o => {
+        const items = Array.isArray(o.items) ? o.items : [];
+        items.forEach(it => {
+          rows.push([
+            o.orderNumber || '',
+            o.serviceType || '',
+            formatDateForCsv(o.paidAt || o.createdAt || ''),
+            it.name || '',
+            it.category || '',
+            formatTimeForCsv(o.createdAt || ''),
+            formatTimeForCsv(o.completedAt || ''),
+            o.paymentMethod || '',
+            (Number(it.amount || 0) || 0).toFixed(2)
+          ]);
+        });
+      });
+
+      const csvContent = rows
+        .map(cols => cols.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+        .join('\r\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'orders.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
+    }
+
+    // ----------------------
+    // Admin renderer (your POS-style version)
+    // ----------------------
+    function escapeHtml(str) {
+      str = String(str ?? '');
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function bucketFromCategory(cat) {
+      const c = String(cat || '');
+      if (c.includes('飲品')) return 'drink';
+      if (c.includes('小食')) return 'snack';
+      if (c === 'Others' || c.toLowerCase().includes('other')) return 'other';
+      return 'food';
+    }
+
+    function buildBucketPivot(itemRows) {
+      const buckets = { food: [], drink: [], snack: [], other: [] };
+      itemRows.forEach(r => {
+        const b = bucketFromCategory(r.category);
+        if (!buckets[b]) buckets[b] = [];
+        buckets[b].push(r);
+      });
+      Object.keys(buckets).forEach(k => buckets[k].sort((a, b) => b.qty - a.qty));
+      return buckets;
+    }
+
+    function renderAdminView() {
+      const wrap = document.getElementById('admin-summary');
+      if (!wrap) return;
+
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const selected = `${yyyy}-${mm}-${dd}`;
+
+      const todays = completedOrders.filter(o => {
+        const d = new Date(o.paidAt || o.createdAt || '');
+        if (Number.isNaN(d.getTime())) return false;
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        return key === selected && (o.paymentMethod || '').trim() !== '';
+      });
+
+      const itemMap = new Map();
+      todays.forEach(o => {
+        (o.items || []).forEach(it => {
+          const key = (it.name || '').trim();
+          if (!key) return;
+          const prev = itemMap.get(key) || { qty: 0, amount: 0, category: it.category || '' };
+          prev.qty += 1;
+          prev.amount += (Number(it.amount || 0) || 0);
+          if (!prev.category && it.category) prev.category = it.category;
+          itemMap.set(key, prev);
+        });
+      });
+
+      const itemRows = Array.from(itemMap.entries())
+        .map(([name, v]) => ({ name, qty: v.qty, amount: v.amount, category: v.category || '' }))
+        .sort((a, b) => b.qty - a.qty);
+
+      const buckets = buildBucketPivot(itemRows);
+
+      const sum = { cash: 0, card: 0, deliveroo: 0, justeat: 0, total: 0 };
+      todays.forEach(o => {
+        const amt = Number(o.total || 0) || 0;
+        sum.total += amt;
+        const m = (o.paymentMethod || '').toLowerCase();
+        if (m === 'cash') sum.cash += amt;
+        else if (m === 'card') sum.card += amt;
+        else if (m === 'deliveroo') sum.deliveroo += amt;
+        else if (m === 'justeat') sum.justeat += amt;
+      });
+
+      wrap.innerHTML = `
+        <div class="ticket-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px;">
+          <div class="ticket"><div class="ticket-header">Cash</div><div class="ticket-body"><strong>£${sum.cash.toFixed(2)}</strong></div></div>
+          <div class="ticket"><div class="ticket-header">Card</div><div class="ticket-body"><strong>£${sum.card.toFixed(2)}</strong></div></div>
+          <div class="ticket"><div class="ticket-header">Deliveroo</div><div class="ticket-body"><strong>£${sum.deliveroo.toFixed(2)}</strong></div></div>
+          <div class="ticket"><div class="ticket-header">Just Eat</div><div class="ticket-body"><strong>£${sum.justeat.toFixed(2)}</strong></div></div>
+          <div class="ticket"><div class="ticket-header">Total</div><div class="ticket-body"><strong>£${sum.total.toFixed(2)}</strong></div></div>
+        </div>
+
+        <div class="ticket" style="margin-top:16px;">
+          <div class="ticket-header"><strong>Today’s Item Sales</strong></div>
+          <div class="ticket-body">
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:16px;">
+              ${['food','drink','snack','other'].map(b => `
+                <div>
+                  <div style="font-weight:800; margin-bottom:8px;">${b.toUpperCase()}</div>
+                  <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; font-weight:700; border-bottom:1px solid #ddd; padding-bottom:6px;">
+                    <div>Item</div><div>Qty</div><div>£</div>
+                  </div>
+                  ${(buckets[b] || []).map(r => `
+                    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+                      <div>${escapeHtml(r.name)}</div>
+                      <div>${r.qty}</div>
+                      <div>£${r.amount.toFixed(2)}</div>
+                    </div>
+                  `).join('') || `<div style="color:#777;padding:8px 0;">No items</div>`}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <p style="color:#666;margin-top:10px;">
+          Orders counted: <strong>${todays.length}</strong>
+        </p>
+      `;
+    }
+
+    // ----------------------
+    // Simple "page password"
+    // ----------------------
+    function adminGate() {
+      const pw = prompt('Enter Admin password:');
+      if (pw !== ADMIN_PASSWORD) {
+        alert('Wrong password.');
+        window.location.href = 'about:blank';
+      }
+    }
+
+    async function refresh() {
+      await loadTodayOrdersFromSupabase();
+      renderAdminView();
+    }
+
+    adminGate();
+    refresh();
+
+    document.getElementById('refresh-btn')?.addEventListener('click', refresh);
+    document.getElementById('export-csv-btn')?.addEventListener('click', exportCsv);
+
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

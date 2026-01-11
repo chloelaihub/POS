@@ -826,6 +826,7 @@ body{
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: auto;
 }
 
 .waitlist-container{
@@ -887,7 +888,7 @@ body{
 #waitlist-view{
   flex:1;
   min-height:0;
-  overflow:hidden;
+  overflow:auto;
   display:flex;
   flex-direction:column;
   background: var(--wl-cream);
@@ -1376,6 +1377,28 @@ button:disabled {
   opacity: 0.4;         /* greyed out look */
   cursor: not-allowed;  /* visual hint */
   pointer-events: none; /* prevent any clicks */
+}
+
+/* Noodle modifiers in green */
+.noodle-mod {
+  color: var(--green);
+  font-weight: 800;
+  background: #e7f7ee;
+  border: 1px solid var(--green);
+  padding: 2px 6px;
+  border-radius: 8px;
+  margin-right: 6px;
+  display: inline-block;
+}
+
+/* Normal modifiers */
+.ticket-mods .mod {
+  margin-right: 6px;
+}
+
+.noodle-green{
+  color:#0b7d3e;
+  font-weight:600;
 }
 
 /* Responsive: tablet portrait */

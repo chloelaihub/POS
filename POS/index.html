@@ -22,9 +22,10 @@
     <button class="tab" data-tab="kitchen-view">廚房</button>
     <button class="tab" data-tab="bar-view">水吧</button>
     <button class="tab" data-tab="all-orders-view">全部訂單</button>
-    <button class="tab" data-tab="customer-view">Customer View</button>
+    <button class="tab" data-tab="customer-view">客人版面</button>
     <button class="tab" data-tab="waitlist-view">等位</button>
-    <button class="tab" data-tab="admin-view">Admin</button>
+    <!-- Admin tab is hidden by default while testing admin.html -->
+    <button class="tab" data-tab="admin-view" id="admin-tab-btn" style="display:none;">Admin</button>
   </div>
 
   <!-- POS view -->
@@ -189,7 +190,7 @@
           <select id="wait-pax">
             <option value="">選擇 Select size</option>
             <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
-            <option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
+            <option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8＋</option>
           </select>
         </div>
 
@@ -303,7 +304,7 @@
 
         <!-- 西多士專用 -->
         <div class="opts" id="french-toast-opts" style="display:none;">
-          <div class="opt">煉奶</div>
+          <div class="opt">煉奶</div><div class="opt">走花生醬</div>
         </div>
 
         <!-- 主食選項 -->
@@ -341,8 +342,8 @@
         </div>
         <div class="opts" id="spring-onion-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">撈丁</div><div class="opt">撈粗</div>
-          <div class="opt">撈拉麵</div><div class="opt">湯米</div><div class="opt">湯通</div><div class="opt">湯意</div>
-          <div class="opt">多蔥油</div><div class="opt">少蔥油</div><div class="opt">煎熟蛋</div><div class="opt">走乾蒜</div>
+          <div class="opt">撈拉麵</div><div class="opt">湯米</div><div class="opt">湯通</div><div class="opt">湯意</div><div class="opt">煎熟蛋</div>
+          <div class="opt">多蔥油</div><div class="opt">少蔥油</div><div class="opt">走蔥油</div><div class="opt">多汁</div><div class="opt">少汁</div><div class="opt">走汁</div><div class="opt">走乾蒜</div>
         </div>
         <div class="opts" id="chakee-noodles-opts" style="display:none;">
           <div class="opt">丁</div><div class="opt">湯米</div><div class="opt">湯通</div><div class="opt">湯意</div>
@@ -425,21 +426,23 @@ const menu = [
 
   { name:"鮮茄焗豬扒飯", price:12.5, cat:"主食", optionGroups:["tomato-baked-opts"], hotCold:false },
   { name:"葡汁焗雞扒飯", price:12.5, cat:"主食", optionGroups:["portuguese-opts"], hotCold:false },
-  { name:"蔥油雞扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"蔥油雞扒煎蛋撈粗", loRamenName:"蔥油雞扒煎蛋撈拉麵", loDingName:"蔥油雞扒煎蛋撈丁", SoupVermicelliName:"蔥油雞扒煎蛋湯米", SoupMacaroniName:"蔥油雞扒煎蛋湯通", SoupSpaghettiName:"蔥油雞扒煎蛋湯意" },
-  { name:"蔥油豬扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"蔥油豬扒煎蛋撈粗", loRamenName:"蔥油豬扒煎蛋撈拉麵", loDingName:"蔥油豬扒煎蛋撈丁", SoupVermicelliName:"蔥油豬扒煎蛋湯米", SoupMacaroniName:"蔥油豬扒煎蛋湯通", SoupSpaghettiName:"蔥油豬扒煎蛋湯意"  },
+  { name:"雞扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"雞扒煎蛋撈粗", loRamenName:"雞扒煎蛋撈拉麵", loDingName:"雞扒煎蛋撈丁", SoupVermicelliName:"雞扒煎蛋湯米", SoupMacaroniName:"雞扒煎蛋湯通", SoupSpaghettiName:"雞扒煎蛋湯意" },
+  { name:"豬扒煎蛋飯", price:10.8, cat:"主食", optionGroups:["spring-onion-opts"], hotCold:false, loMeinName:"豬扒煎蛋撈粗", loRamenName:"豬扒煎蛋撈拉麵", loDingName:"豬扒煎蛋撈丁", SoupVermicelliName:"豬扒煎蛋湯米", SoupMacaroniName:"豬扒煎蛋湯通", SoupSpaghettiName:"豬扒煎蛋湯意"  },
   { name:"牛筋腩飯", price:11.8, cat:"主食", optionGroups:["brisket-opts"], hotCold:false, loMeinName:"牛筋腩撈粗", loRamenName:"牛腩撈拉麵", loDingName:"牛腩撈丁", SoupMeinName:"牛筋腩湯粗", SoupRamenName:"牛筋腩湯拉麵", SoupDingName:"牛筋腩湯丁"},
   { name:"叉燒煎蛋飯", price:11.5, cat:"主食", optionGroups:["charsiu-opts"], hotCold:false, loMeinName:"叉燒煎蛋撈粗" },
   { name:"泡菜五花腩飯", price:11.5, cat:"主食", optionGroups:["kimchi-opts"], hotCold:false },
   { name:"滑蛋鰻魚飯", price:13.5, cat:"主食", optionGroups:["basic-rice-opts"], hotCold:false },
 
   // 飲品
-  { name:"奶茶", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","milktea-opts"], hotCold:true },
-  { name:"檸茶", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts", "lemon-opts"], hotCold:true },
+  { name:"熱奶茶", price:3.8, cat:"飲品", optionGroups:["milktea-opts"], hotCold:true },
+  { name:"凍奶茶", price:3.8, cat:"飲品", optionGroups:["milktea-opts"], hotCold:true },
+  { name:"熱檸茶", price:3.0, cat:"飲品", optionGroups:["lemon-opts"], hotCold:true },
+  { name:"凍檸茶", price:3.0, cat:"飲品", optionGroups:["lemon-opts"], hotCold:true },
   { name:"檸水", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts", "lemon-opts"], hotCold:true },
-  { name:"粒粒椰汁紅豆冰", price:4.0, cat:"飲品", optionGroups:["redbean-opts"], hotCold:false },
+  { name:"紅豆冰", price:4.0, cat:"飲品", optionGroups:["redbean-opts"], hotCold:false },
   { name:"好立克", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
   { name:"阿華田", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","ovaltine-horlicks-opts"], hotCold:true },
-  { name:"柚子薑蜜", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","citron-opts"], hotCold:true },
+  { name:"熱柚子薑蜜", price:3.0, cat:"飲品", optionGroups:["hot-cold-opts","citron-opts"], hotCold:true },
   { name:"咖啡", price:2.0, cat:"飲品", optionGroups:["hot-cold-opts","coffee-opts"], hotCold:true },
   { name:"鴛鴦", price:3.8, cat:"飲品", optionGroups:["hot-cold-opts","yuenyeung-opts"], hotCold:true },
   { name:"凍檸樂", price:2.5, cat:"飲品", optionGroups:[], hotCold:false },
@@ -447,12 +450,12 @@ const menu = [
   { name:"Coke", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"Zero", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
   { name:"7up", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
-  { name:"紅茶", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
+  { name:"Breakfast Tea", price:2.0, cat:"飲品", optionGroups:[], hotCold:false },
 
   // 小食
   { name:"土匪雞翼", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
-  { name:"鹵水牛展", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
-  { name:"花生醬西多士", price:6.5, cat:"小食", optionGroups:["french-toast-opts"], hotCold:false },
+  { name:"牛展", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
+  { name:"西多士", price:6.5, cat:"小食", optionGroups:["french-toast-opts"], hotCold:false },
   { name:"半份西多士", price:4.0, cat:"小食", optionGroups:["french-toast-opts"], hotCold:false },
   { name:"餃子", price:4.4, cat:"小食", optionGroups:[], hotCold:false },
 
@@ -461,6 +464,7 @@ const menu = [
   { name:"生雲吞", price:8.0, cat:"Others", optionGroups:[], hotCold:false, excludeFromCashDiscount:true },
   { name:"套餐 -£0.5", price:-0.5, cat:"Others", optionGroups:[], hotCold:false },
   { name:"BB通粉", price:0.0, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"走飯", price:-1.0, cat:"Others", optionGroups:[], hotCold:false },
 ];
 
 let order = [];
@@ -566,9 +570,13 @@ const DIRECT_ADD_DRINKS = [
   "7up",
   "凍檸樂",
   "凍咸檸七",
-  "柚子薑蜜",
-  "粒粒椰汁紅豆冰",
-  "紅茶",
+  "熱柚子薑蜜",
+  "紅豆冰",
+  "Breakfast Tea",
+  "熱奶茶",
+  "凍奶茶",
+  "熱檸茶",
+  "凍檸茶",
   "套餐 -£0.5",
 ];
 
@@ -715,7 +723,37 @@ function openModal(item, menuIndex) {
     });
   }
 
+  // ----------------------------
+  // 🟢 Highlight noodle options in green (ONLY ONCE)
+  // ----------------------------
+
+  // ✅ Get visible option buttons reliably (computedStyle)
+  const visibleOpts = Array.from(document.querySelectorAll('.opts'))
+    .filter(group => getComputedStyle(group).display !== 'none')
+    .flatMap(group => Array.from(group.querySelectorAll('.opt')));
+
+  // 🧼 Clear old noodle highlight so it won't stick between items
+  visibleOpts.forEach(opt => opt.classList.remove('noodle-option'));
+
+  // 🟢 Noodle option keywords
+  const noodleKeywords = [
+    '丁', '湯拉麵', '湯米', '湯通', '湯意', '湯粗',
+    '撈粗', '撈拉麵', '撈丁', '河粉', '意粉'
+  ];
+
+  // ✅ Add noodle-option class to matching buttons
+  visibleOpts.forEach(opt => {
+    const label = opt.textContent.trim();
+    const isNoodle = noodleKeywords.some(k => label.includes(k));
+    if (isNoodle) opt.classList.add('noodle-option');
+  });
+
+  // ----------------------------
+  // 🟢 Highlight noodle options in green
+  // ----------------------------
   document.querySelectorAll('.opt').forEach(o => o.classList.remove('sel'));
+  document.querySelectorAll('.opt').forEach(o => o.classList.remove('noodle-option'));
+
   const noteEl = document.querySelector('#modal textarea');
   if (noteEl) noteEl.value = '';
 
@@ -723,8 +761,9 @@ function openModal(item, menuIndex) {
     const existing = order[editingOrderItemIndex];
     const existingMods = Array.isArray(existing.mods) ? existing.mods : [];
 
+    // ✅ visible options (use computedStyle so it works even if style.display is '')
     const visibleOpts = Array.from(document.querySelectorAll('.opts'))
-      .filter(group => group.style.display !== 'none')
+      .filter(group => getComputedStyle(group).display !== 'none')
       .flatMap(group => Array.from(group.querySelectorAll('.opt')));
 
     const usedMods = new Set();
@@ -1033,8 +1072,8 @@ document.getElementById('add').addEventListener('click', () => {
     if (
       !addedSpringOnionLoCharge &&
       (v === '撈粗' || v === '撈丁') &&
-      (current.baseName === '蔥油雞扒煎蛋飯' ||
-       current.baseName === '蔥油豬扒煎蛋飯')
+      (current.baseName === '雞扒煎蛋飯' ||
+       current.baseName === '豬扒煎蛋飯')
     ) {
       price += 1;
       addedSpringOnionLoCharge = true;
@@ -1067,12 +1106,21 @@ document.getElementById('add').addEventListener('click', () => {
       name = current.DingName;
       isDing = true;
     }
-    if ((v === '熱' || v === '凍') && current.isHotCold) {
-      name = v + name;
+    if (mods.includes('凍')) {
+      if (name.startsWith('熱')) {
+        name = name.replace(/^熱/, '凍');   // 熱X -> 凍X
+      } else {
+        name = '凍' + name;
+      }
+      mods.splice(mods.indexOf('凍'), 1);
     }
     if (v === '餐') {
       price += 2;
       isSetMeal = true;
+    }
+    if (name === '熱柚子薑蜜' && mods.includes('凍')) {
+      name = '凍柚子薑蜜';
+      mods.splice(mods.indexOf('凍'), 1);
     }
   });
 
@@ -1895,6 +1943,19 @@ function renderTicketItemLine(item, orderId, index, kind) {
   const isDone = item.status === 'complete';
 
   let name = item.displayName || '';
+
+  // 🟢 Noodle keywords → turn green in title text
+  const noodleKeywords = [
+    '丁','湯拉麵','湯米','湯通','湯意','湯粗',
+    '撈粗','撈拉麵','撈丁','河粉','意粉'
+  ];
+
+  noodleKeywords.forEach(k => {
+    const reg = new RegExp(k, 'g');
+    name = name.replace(reg, `<span class="noodle-green">${k}</span>`);
+  });
+
+  // keep your set-meal blue mark
   if (item.isSetMeal) {
     name += ' <span class="blue">餐</span>';
   }
@@ -1916,6 +1977,15 @@ function renderTicketItemLine(item, orderId, index, kind) {
       </button>
     </div>
   `;
+}
+
+function isNoodleMod(text) {
+  const t = String(text || '').trim();
+
+  // 🟢 noodles keywords (mods)
+  const noodleKeywords = ['丁','湯拉麵','湯米','湯通','湯意','湯粗','撈粗','撈拉麵','撈丁','河粉','意粉'];
+
+  return noodleKeywords.some(k => t.includes(k));
 }
 
 // 🧠 Helper: decide what to show in the BIG header label
@@ -2388,26 +2458,14 @@ function buildBucketPivot(itemRows) {
 
   itemRows.forEach(r => {
     const b = bucketFromCategory(r.category);
+
+    // ✅ extra safety: if bucket key doesn't exist, create it (prevents crashes)
+    if (!buckets[b]) buckets[b] = [];
+    
     buckets[b].push(r);
   });
 
   // Sort each bucket by qty desc (admin view logic – unchanged)
-  Object.keys(buckets).forEach(k => {
-    buckets[k].sort((a, b) => b.qty - a.qty);
-  });
-
-  return buckets;
-}
-
-function buildBucketPivot(itemRows) {
-  const buckets = { food: [], drink: [], snack: [] };
-
-  itemRows.forEach(r => {
-    const b = bucketFromCategory(r.category);
-    buckets[b].push(r);
-  });
-
-  // Sort each bucket by qty desc
   Object.keys(buckets).forEach(k => {
     buckets[k].sort((a, b) => b.qty - a.qty);
   });
@@ -2561,6 +2619,22 @@ wrap.innerHTML = `
                 <div>£${r.amount.toFixed(2)}</div>
               </div>
             `).join('') || `<div style="color:#777; padding:8px 0;">No snack items</div>`}
+          </div>
+
+          <!-- Others -->
+          <div>
+            <div style="font-weight:800; margin-bottom:8px;">Others</div>
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; font-weight:700; border-bottom:1px solid #ddd; padding-bottom:6px;">
+              <div>Item</div><div>Qty</div><div>£</div>
+            </div>
+
+            ${buckets.other.map(r => `
+              <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+                <div>${r.name}</div>
+                <div>${r.qty}</div>
+                <div>£${r.amount.toFixed(2)}</div>
+              </div>
+            `).join('') || `<div style="color:#777; padding:8px 0;">No other items</div>`}
           </div>
 
         </div>
@@ -3567,6 +3641,7 @@ async function loadWaitlist() {
     // Convert DB rows into the shape used by the UI:
     // { name, pax, time: timestamp(ms) }
     waitlist = (data || []).map(row => ({
+      id: row.id, // ✅ keep Supabase primary key so we can delete/update
       name: row.name,
       pax: row.pax,
       time: row.created_at ? new Date(row.created_at).getTime() : Date.now()
@@ -3605,7 +3680,12 @@ async function logWaitlistEvent(entry, action) {
   }
 }
 
-document.getElementById('add-wait-btn')?.addEventListener('click', () => {
+// ===============================
+// ✅ WAITLIST: Add / Seat / Remove (Supabase source of truth)
+// ===============================
+
+// Add waitlist entry
+document.getElementById('add-wait-btn')?.addEventListener('click', async () => {
   const name = document.getElementById('wait-name')?.value.trim();
   const paxVal = document.getElementById('wait-pax')?.value;
   const pax = parseInt(paxVal, 10);
@@ -3615,57 +3695,108 @@ document.getElementById('add-wait-btn')?.addEventListener('click', () => {
     return;
   }
 
-  const entry = {
-    name,
-    pax,
-    time: Date.now()
-  };
+  // ✅ Create an entry timestamp (we store this into created_at)
+  const entry = { name, pax, time: Date.now() };
 
-  waitlist.push(entry);
-
-  saveWaitlist();
-  renderWaitlist();
-
-  // 🔹 log that this person was added to the waitlist
-  logWaitlistEvent(entry, 'added');
-
-  document.getElementById('wait-name').value = '';
-  document.getElementById('wait-pax').value = '';
-});
-
-document.getElementById('waitlist-tbody')?.addEventListener('click', (e) => {
-  const seatBtn = e.target.closest('[data-seat]');
-  const removeBtn = e.target.closest('[data-remove]');
-
-  if (seatBtn) {
-    const idx = Number(seatBtn.dataset.seat);
-    if (!Number.isNaN(idx)) {
-      const [entry] = waitlist.splice(idx, 1);  // remove and keep the entry
-      saveWaitlist();
-      renderWaitlist();
-
-      // 🔹 log that this person was seated
-      if (entry) {
-        logWaitlistEvent(entry, 'seated');
-      }
-    }
+  // ✅ If supabase client missing, fallback to local only (optional)
+  if (typeof supabaseClient === 'undefined') {
+    waitlist.push(entry);
+    renderWaitlist();
     return;
   }
 
-  if (removeBtn) {
-    const idx = Number(removeBtn.dataset.remove);
-    if (!Number.isNaN(idx)) {
-      const [entry] = waitlist.splice(idx, 1);  // remove and keep the entry
-      saveWaitlist();
-      renderWaitlist();
+  try {
+    // ✅ Insert into Supabase so ALL devices see it
+    const { error } = await supabaseClient
+      .from('waitlist')
+      .insert({
+        name: entry.name,
+        pax: entry.pax,
+        created_at: new Date(entry.time).toISOString()
+      });
 
-      // 🔹 log that this person was removed (no-show / cancelled)
-      if (entry) {
-        logWaitlistEvent(entry, 'removed');
-      }
+    if (error) {
+      console.error('Failed to add waitlist row:', error.message);
+      alert('新增候位失敗，請再試一次');
+      return;
     }
+
+    // 🔹 log history (optional)
+    logWaitlistEvent(entry, 'added');
+
+    // ✅ Reload shared state and render
+    await loadWaitlist();
+    renderWaitlist();
+
+    // ✅ Clear inputs
+    document.getElementById('wait-name').value = '';
+    document.getElementById('wait-pax').value = '';
+  } catch (err) {
+    console.error('Unexpected error adding waitlist row:', err);
   }
 });
+
+
+// Seat / Remove actions
+document.getElementById('waitlist-tbody')?.addEventListener('click', async (e) => {
+  const seatBtn = e.target.closest('[data-seat]');
+  const removeBtn = e.target.closest('[data-remove]');
+
+  if (!seatBtn && !removeBtn) return;
+
+  const idx = Number((seatBtn || removeBtn).dataset.seat ?? (seatBtn || removeBtn).dataset.remove);
+  if (Number.isNaN(idx)) return;
+
+  const entry = waitlist[idx];
+  const id = entry?.id; // ✅ this must exist now because loadWaitlist includes row.id
+
+  if (!id) {
+    console.error('Missing waitlist row id (loadWaitlist must include row.id).');
+    return;
+  }
+
+  if (typeof supabaseClient === 'undefined') {
+    // fallback local only (optional)
+    waitlist.splice(idx, 1);
+    renderWaitlist();
+    return;
+  }
+
+  try {
+    // ✅ delete from Supabase
+    const { error } = await supabaseClient
+      .from('waitlist')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Failed to delete waitlist row:', error.message);
+      alert('更新候位失敗，請再試一次');
+      return;
+    }
+
+    // 🔹 log history
+    logWaitlistEvent(entry, seatBtn ? 'seated' : 'removed');
+
+    // ✅ reload shared state (source of truth) and render
+    await loadWaitlist();
+    renderWaitlist();
+  } catch (err) {
+    console.error('Unexpected waitlist delete error:', err);
+  }
+});
+
+function subscribeWaitlistRealtime() {
+  if (typeof supabaseClient === 'undefined') return;
+
+  supabaseClient
+    .channel('waitlist-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'waitlist' }, () => {
+      // ✅ Anytime waitlist changes on ANY device → reload
+      loadWaitlist().then(renderWaitlist);
+    })
+    .subscribe();
+}
 
 // 🔄 Update payment info in Supabase for an existing order
 // - Sets payment_status to 'paid'
@@ -3709,6 +3840,37 @@ async function updatePaymentInSupabase(ticket) {
   }
 }
 
+// ==============================
+// TEMP: Hide Admin in index.html
+// Show only if URL includes ?showAdmin=1
+// This lets you keep the Admin code while you test admin.html,
+// without kitchen staff seeing the Admin tab.
+// ==============================
+(function hideAdminUntilReady() {
+  const params = new URLSearchParams(window.location.search);
+  const showAdmin = params.get('showAdmin') === '1';
+
+  const adminTabBtn = document.getElementById('admin-tab-btn');
+  const adminView = document.getElementById('admin-view');
+
+  if (!showAdmin) {
+    // Hide Admin UI completely
+    if (adminTabBtn) adminTabBtn.style.display = 'none';
+    if (adminView) adminView.style.display = 'none';
+
+    // Safety: If somehow they are on admin-view, kick them to POS view
+    // (change 'pos-view' if your default view id is different)
+    const current = document.querySelector('.tab.active')?.dataset?.tab;
+    if (current === 'admin-view') {
+      switchToView('pos-view');
+    }
+    return;
+  }
+
+  // If showAdmin=1 is present, reveal Admin tab
+  if (adminTabBtn) adminTabBtn.style.display = '';
+})();
+
 // Initial render
 // We wrap startup in an async IIFE so we can await data (waitlist + today's
 // orders from Supabase) before drawing the UI on ANY device.
@@ -3725,8 +3887,9 @@ async function updatePaymentInSupabase(ticket) {
   renderBarView();
   renderAllOrdersView();
   renderCustomerView();
-  renderWaitlist();
   applyTabAccessMode();
+  renderWaitlist();             // ✅ you already loaded it above
+  subscribeWaitlistRealtime();  // ✅ then start realtime listening
 
   // ⭐ wire up the table buttons
   initTableButtons();
@@ -3744,6 +3907,25 @@ async function updatePaymentInSupabase(ticket) {
     renderCustomerView();
     if (adminUnlocked) renderAdminView();
   }, 5000); // 5000ms = 5 seconds
+
+  // ==============================
+  // Waitlist auto refresh (backup polling)
+  // ==============================
+
+  // Refresh every 5 seconds
+  setInterval(async () => {
+    // ✅ Only refresh if Supabase exists
+    if (typeof supabaseClient === 'undefined') return;
+
+    // ✅ Optional: only refresh if waitlist tab is visible/active
+    const waitTab = document.getElementById('waitlist-view');
+    const isVisible = waitTab && waitTab.style.display !== 'none';
+
+    if (!isVisible) return;
+
+    await loadWaitlist();
+    renderWaitlist();
+  }, 5000);
 })();
 
 // ===== Auto-update wait time every minute (Waitlist tab) =====
