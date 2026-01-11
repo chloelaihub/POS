@@ -1401,6 +1401,21 @@ button:disabled {
   font-weight:600;
 }
 
+  /* ===========================
+   iPhone admin page fix
+   Allow horizontal scroll inside admin content
+   =========================== */
+
+   #admin-summary {
+    overflow-x: auto;                 /* allow sideways scroll */
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Prevent grid rows from shrinking too small */
+  #admin-summary .ticket-body > div {
+    min-width: 360px;
+  }  
+
 /* Responsive: tablet portrait */
 @media (max-width: 900px){
   .wl-form{ grid-template-columns: 1fr; }
