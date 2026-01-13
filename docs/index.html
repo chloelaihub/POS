@@ -361,6 +361,7 @@
          <div class="opts" id="global-opts" style="display:none;">
          <div class="opt">外賣</div>
          <div class="opt">後上</div>
+         <div class="opt opt-egg" style="display:none;">加蛋+50p</div>
         </div>
 
         <textarea placeholder="特別要求..."></textarea>
@@ -564,6 +565,7 @@ function applyTabAccessMode() {
 }
 
 const DIRECT_ADD_CATEGORIES = ["咖喱系列", "主食", "小食", "Others"];
+const FOOD_CATS = ['咖喱系列', '茶記粉面', '主食', '小食'];
 const DIRECT_ADD_DRINKS = [
   "Coke",
   "Zero",
@@ -780,6 +782,16 @@ function openModal(item, menuIndex) {
     if (leftover.length && noteEl) {
       noteEl.value = leftover.join(', ');
     }
+
+      // Always show the universal options for every item
+      const globalOpts = document.getElementById('global-opts');
+      if (globalOpts) globalOpts.style.display = 'grid';
+
+      // ✅ NEW: Only show "加蛋 + 50p" for FOOD items (not drinks)
+      const eggOpt = document.querySelector('#global-opts .opt-egg');
+      if (eggOpt) {
+        eggOpt.style.display = FOOD_CATS.includes(item.cat) ? '' : 'none';
+      }
   }
 
   document.getElementById('modal').style.display = 'flex';
@@ -1121,6 +1133,9 @@ document.getElementById('add').addEventListener('click', () => {
     if (name === '熱柚子薑蜜' && mods.includes('凍')) {
       name = '凍柚子薑蜜';
       mods.splice(mods.indexOf('凍'), 1);
+    }
+    if (mods.includes('加蛋+50p')) {
+      price += 0.5;
     }
   });
 
@@ -3145,13 +3160,28 @@ async function payExistingTicket(method, overrideTotal = null) {
     }))
   });
 
-  // 4️⃣ Clear POS state
-  payingOrderId = null;
-  order = [];
-  isCash = false;
-  updateOrder();
+    // 4️⃣ Clear POS state (after paying an existing unpaid ticket)
+    payingOrderId = null;
+    order = [];
+    isCash = false;
+    updateOrder();
 
-  if (payModal) payModal.style.display = 'none';
+    // ✅ NEW: Reset service type back to default (堂食) AFTER payment
+    // Reason:
+    // - For unpaid tickets, we temporarily restore the original type (e.g. 電話外賣)
+    //   so cashier can see what it was.
+    // - After payment is finished, we want the POS to return to the normal default
+    //   so the next order doesn't accidentally stay as 電話外賣.
+    resetServiceTypeAndTable();
+
+    // ✅ Optional: clear pickup/table input UI too (so next order starts clean)
+    const pickupInput = document.getElementById('pickup-time');
+    if (pickupInput) pickupInput.value = '';
+
+    const tableInput = document.getElementById('order-number');
+    if (tableInput) tableInput.value = '';
+
+    if (payModal) payModal.style.display = 'none';
 
   // 5️⃣ Re-render boards so payment badge updates to "Paid"
   renderAllOrdersView();
