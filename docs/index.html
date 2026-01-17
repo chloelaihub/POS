@@ -1161,8 +1161,7 @@ document.getElementById('add').addEventListener('click', () => {
     cat: current.cat,
     menuIndex: (typeof current.menuIndex === 'number') ? current.menuIndex : null,
     excludeFromComboB: !!current.excludeFromComboB,
-    // ✅ NEW: keep this flag on the order line so cash discount can exclude it
-   excludeFromCashDiscount: !!current.excludeFromCashDiscount
+    excludeFromCashDiscount: !!current.excludeFromCashDiscount
   };
 
   // ✅ If editing an All Orders ticket item, save back into that ticket instead of POS order[]
