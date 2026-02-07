@@ -38,7 +38,7 @@
         <div class="order-meta">
          <!-- Table number (we keep the same id so JS still works) -->
           <div class="order-meta-row">
-           <label>Table #</label>
+           <label>枱號</label>
           <div class="table-selector">
             <div class="table-buttons">
               <button type="button" class="table-btn" data-table="1">1</button>
@@ -57,7 +57,7 @@
         </div>
 
      <div class="order-meta-row">
-        <label for="order-type">Type</label>
+        <label for="order-type">落單類型</label>
         <select id="order-type">
          <option value="dine-in">堂食</option>
         <option value="takeaway">現場外賣</option>
@@ -69,13 +69,13 @@
 
     <!-- Expected pickup time -->
     <div class="order-meta-row">
-      <label for="pickup-time">Pickup</label>
+      <label for="pickup-time">取餐時間</label>
       <input id="pickup-time" type="time" step="60" />
     </div>
   </div>
 
         <!-- Order summary -->
-        <h2 style="font-size:1.8em;color:var(--green);margin-bottom:18px;">Order Summary</h2>
+        <h2 style="font-size:1.8em;color:var(--green);margin-bottom:18px;">總纜</h2>
         <div id="order-list">
           <p class="empty-order">No items yet</p>
         </div>
@@ -89,9 +89,9 @@
         <!-- Card, Cash, Add, Unpaid pay buttons -->
        <div class="order-footer">
         <div class="pay-buttons">
-         <button class="pay-btn" id="payment-btn" type="button">Payment</button>
-         <button class="pay-btn" id="platform-btn" type="button">Add</button>
-         <button class="pay-btn" id="unpaid-btn" type="button">Unpaid</button>
+         <button class="pay-btn" id="payment-btn" type="button">付款</button>
+         <button class="pay-btn" id="platform-btn" type="button">加</button>
+         <button class="pay-btn" id="unpaid-btn" type="button">後數</button>
        </div>
       </div>
     </div>
@@ -467,6 +467,8 @@ const menu = [
   { name:"BB通粉", price:0.0, cat:"Others", optionGroups:[], hotCold:false },
   { name:"走飯", price:-1.0, cat:"Others", optionGroups:[], hotCold:false },
   { name:"加飯", price:2.0, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"支裝水", price:1.0, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"加泡菜", price:2.0, cat:"Others", optionGroups:[], hotCold:false },
 ];
 
 let order = [];
@@ -3200,8 +3202,8 @@ function renderCustomerView() {
   const pickupInput = document.getElementById('pickup-time');
 
   // These values are set by updateOrder()
-  const subtotal   = order.length ? lastSubtotal   : 0;
-  const baseTotal  = order.length ? lastBaseTotal  : 0; // after combo discount
+  const subtotal   = order.length ? lastSubtotal   : 0; // before any discount
+  const baseTotal  = subtotal;                          // ✅ Base total = subtotal (pre-discount)
   const finalTotal = order.length ? lastFinalTotal : 0; // after cash discount (if cash)
 
   // Combo discount values for display
@@ -3231,9 +3233,9 @@ function renderCustomerView() {
 
   // 🔹 3. Build the meta “pills” at the top (type, table, pickup)
   const meta = [];
-  if (typeLabel) meta.push(`Type: ${typeLabel}`);
-  if (tableOrNo) meta.push(`Table#: ${tableOrNo}`);
-  if (pickup)    meta.push(`Pickup: ${pickup}`);
+  if (typeLabel) meta.push(`落單類型: ${typeLabel}`);
+  if (tableOrNo) meta.push(`枱號: ${tableOrNo}`);
+  if (pickup)    meta.push(`取餐時間: ${pickup}`);
 
   // 🔹 4. If there is NO order, show a simple empty state and exit early
   if (!order.length) {
@@ -3360,7 +3362,7 @@ function renderCustomerView() {
       ${itemsHtml}
 
       <div class="customer-total">
-        <div>Base total</div>
+        <div>折扣前金額</div>
         <div>£${baseTotal.toFixed(2)}</div>
       </div>
 
@@ -3385,7 +3387,7 @@ function renderCustomerView() {
       <hr style="margin:10px 0;">
 
       <div class="customer-total" style="font-size:26px;">
-        <div>Total</div>
+        <div>應付金額</div>
         <div>£${finalTotal.toFixed(2)}</div>
       </div>
     </div>
