@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>獅子山 Lion Rock POS</title>
+<script>
+      (function() {
+        var _0x4f2 = 'Firstavenue'; 
+        var _0x1a3 = prompt("Please enter the password to access the POS:");
+        
+        if (_0x1a3 !== _0x4f2) {
+          alert("Unauthorized access.");
+          window.location.replace("https://google.com"); // Send them away
+          // This stops the rest of the page from rendering
+          document.documentElement.innerHTML = ""; 
+        }
+      })();
+    </script>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <!-- Supabase: load client & expose `supabaseClient` for the POS script -->
