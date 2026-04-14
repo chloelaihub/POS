@@ -37,8 +37,7 @@
     <button class="tab" data-tab="all-orders-view">全部訂單</button>
     <button class="tab" data-tab="customer-view">客人版面</button>
     <button class="tab" data-tab="waitlist-view">等位</button>
-    <!-- Admin tab is hidden by default while testing admin.html -->
-    <button class="tab" data-tab="admin-view" id="admin-tab-btn" style="display:none;">Admin</button>
+    <button class="tab" data-tab="admin-view">Admin</button>
   </div>
 
   <!-- POS view -->
@@ -332,33 +331,34 @@
         <!-- 主食選項 -->
         <div class="opts" id="plain-curry-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">走乾蒜</div>
+          <div class="opt">撈丁</div><div class="opt">撈粗</div><div class="opt">撈拉麵</div>
           <div class="opt">多薯仔</div><div class="opt">少薯仔</div><div class="opt">走薯仔</div>
         </div>
         <div class="opts" id="baked-curry-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div>
           <div class="opt">多薯仔</div><div class="opt">少薯仔</div><div class="opt">走薯仔</div>
           <div class="opt">多芝士</div><div class="opt">少芝士</div><div class="opt">走芝士</div>
-          <div class="opt">免焗</div>
+          <div class="opt">多汁</div><div class="opt">少汁</div><div class="opt">免焗</div>
         </div>
         <div class="opts" id="tomato-baked-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div>
           <div class="opt">多菠蘿</div><div class="opt">走菠蘿</div><div class="opt">轉雞扒</div>
           <div class="opt">多芝士</div><div class="opt">少芝士</div><div class="opt">走芝士</div>
-          <div class="opt">免焗</div>
+          <div class="opt">多汁</div><div class="opt">少汁</div><div class="opt">免焗</div>
         </div>
         <div class="opts" id="portuguese-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">意粉</div>
           <div class="opt">轉豬扒</div>
           <div class="opt">多芝士</div><div class="opt">少芝士</div><div class="opt">走芝士</div>
-          <div class="opt">免焗</div>
+          <div class="opt">多汁</div><div class="opt">少汁</div><div class="opt">免焗</div>
         </div>
         <div class="opts" id="spring-onion-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">走乾蒜</div>
           <div class="opt">撈丁</div><div class="opt">撈粗</div><div class="opt">撈拉麵</div>
           <div class="opt">湯米</div><div class="opt">湯通</div><div class="opt">湯意</div>
-          <div class="opt">多蔥油</div><div class="opt">少蔥油</div><div class="opt">走蔥油</div>
+          <div class="opt">多蔥油</div><div class="opt">少蔥油</div><div class="opt">走蔥油</div><div class="opt">蔥油分上</div>
           <div class="opt">多汁</div><div class="opt">少汁</div><div class="opt">走汁</div>
-          <div class="opt">煎熟蛋</div>
+          <div class="opt">煎熟蛋</div><div class="opt">反蛋</div>
         </div>
         <div class="opts" id="brisket-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">走乾蒜</div>
@@ -369,7 +369,7 @@
         </div>
         <div class="opts" id="charsiu-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">走乾蒜</div>
-          <div class="opt">煎熟蛋</div><div class="opt">撈粗</div>
+          <div class="opt">煎熟蛋</div><div class="opt">反蛋</div><div class="opt">撈粗</div>
         </div>
         <div class="opts" id="kimchi-opts" style="display:none;">
           <div class="opt">多飯</div><div class="opt">少飯</div><div class="opt">走乾蒜</div>
@@ -386,6 +386,7 @@
           <div class="opt">太陽蛋</div><div class="opt">煎熟蛋</div><div class="opt">炒熟蛋</div>
           <div class="opt">走包</div><div class="opt">包走牛油</div><div class="opt">包少牛油</div>
           <div class="opt">包多牛油</div><div class="opt">包唔烘</div><div class="opt">包烘耐啲</div>
+          <div class="opt">反蛋</div><div class="opt">熱湯</div><div class="opt">爽麵</div>
         </div>
         <div class="opts" id="set-meal-opts" style="display:none;">
           <div class="opt">餐</div>
@@ -446,9 +447,9 @@
 <script>
 const menu = [
   // 主食 & 咖喱系列
-  { name:"咖喱雞扒飯", price:11.8, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false },
-  { name:"咖喱豬扒飯", price:11.8, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false },
-  { name:"咖喱牛腩飯", price:12.3, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false },
+  { name:"咖喱雞扒飯", price:11.8, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false, loMeinName:"咖喱雞扒撈粗", loRamenName:"咖喱雞扒撈拉麵", loDingName:"咖喱雞扒撈丁" },
+  { name:"咖喱豬扒飯", price:11.8, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false, loMeinName:"咖喱豬扒撈粗", loRamenName:"咖喱豬扒撈拉麵", loDingName:"咖喱豬扒撈丁" },
+  { name:"咖喱牛腩飯", price:12.3, cat:"咖喱系列", optionGroups:["plain-curry-opts"], hotCold:false, loMeinName:"咖喱牛腩撈粗", loRamenName:"咖喱牛腩撈拉麵", loDingName:"咖喱牛腩撈丁" },
   { name:"焗咖喱雞扒飯", price:12.8, cat:"咖喱系列", optionGroups:["baked-curry-opts"], hotCold:false },
   { name:"焗咖喱豬扒飯", price:12.8, cat:"咖喱系列", optionGroups:["baked-curry-opts"], hotCold:false },
   { name:"焗咖喱牛腩飯", price:13.3, cat:"咖喱系列", optionGroups:["baked-curry-opts"], hotCold:false },
@@ -496,15 +497,15 @@ const menu = [
 
   // Others
   { name:"炒蛋多士", price:2.0, cat:"Others", optionGroups:[], hotCold:false },
-  { name:"生雲吞", price:12.0, cat:"Others", optionGroups:[], hotCold:false, excludeFromCashDiscount:true },
-  { name:"套餐 -£0.5", price:-0.5, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"BB通粉", price:0.0, cat:"Others", optionGroups:[], hotCold:false },
   { name:"走飯", price:-1.0, cat:"Others", optionGroups:[], hotCold:false },
   { name:"加飯", price:2.0, cat:"Others", optionGroups:[], hotCold:false },
-  { name:"支裝水", price:1.0, cat:"Others", optionGroups:[], hotCold:false },
   { name:"加泡菜", price:2.0, cat:"Others", optionGroups:[], hotCold:false },
-  { name:"BB通粉", price:0.0, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"套餐 -£0.5", price:-0.5, cat:"Others", optionGroups:[],  hotCold:false },
+  { name:"支裝水", price:1.0, cat:"Others", optionGroups:[], hotCold:false },
   { name:"暖水", price:0.0, cat:"Others", optionGroups:[], hotCold:false },
   { name:"凍水", price:0.0, cat:"Others", optionGroups:[], hotCold:false },
+  { name:"生雲吞", price:12.0, cat:"Others", optionGroups:[], hotCold:false, excludeFromCashDiscount:true },
 ];
 
 let order = [];
@@ -553,7 +554,7 @@ function getTodayRangeISO() {
 }
 
 // shape: { ticketId: string, lane: 'food'|'drink', index: number }
-const ADMIN_PASSWORD = '6575';
+const ADMIN_PASSWORD = '2026';
 
 // === Editing & Direct Add Controls ===
 let editingOrderItemIndex = null;
